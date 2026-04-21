@@ -63,14 +63,15 @@ def build_readme(data: dict[str, Any]) -> str:
     if summary:
         parts.append(f"{esc(summary)}\n")
 
-    if slug or data.get("schema_version"):
-        meta_bits = []
-        if isinstance(data.get("schema_version"), str):
-            meta_bits.append(f"Metadata schema **{data['schema_version']}**")
-        if isinstance(slug, str) and slug.strip():
-            meta_bits.append(f"slug `{esc(slug)}`")
-        if meta_bits:
-            parts.append("\n" + " · ".join(meta_bits) + ".\n")
+    meta_rows: list[tuple[str, str]] = []
+    if isinstance(data.get("schema_version"), str):
+        meta_rows.append(("Schema version", esc(data["schema_version"])))
+    if isinstance(slug, str) and slug.strip():
+        meta_rows.append(("Slug", f"`{esc(slug)}`"))
+    if meta_rows:
+        parts.append("\n| Key | Value |\n|-----|-------|\n")
+        for k, v in meta_rows:
+            parts.append(f"| **{k}** | {v} |\n")
 
     authors = data.get("authors")
     if isinstance(authors, list) and authors:
