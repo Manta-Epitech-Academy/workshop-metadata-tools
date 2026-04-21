@@ -26,6 +26,14 @@ def esc(s: str) -> str:
     return s.replace("\r\n", "\n").strip()
 
 
+def md_file_link(path: str) -> str:
+    """Markdown link to a workshop file (path as stored in metadata, relative to repo root)."""
+    p = path.strip()
+    if not p:
+        return "—"
+    return f"[{p}]({p})"
+
+
 def render_section_tree(nodes: list[Any], depth: int = 0) -> list[str]:
     lines: list[str] = []
     for node in nodes:
@@ -103,10 +111,11 @@ def build_readme(data: dict[str, Any]) -> str:
                 extra = "depends on: " + ", ".join(str(x) for x in dep)
                 note = f"{note}; {extra}" if note else extra
             cell = note if note else "—"
-            parts.append(f"| `{path}` | {cell} |\n")
+            link = md_file_link(path) if isinstance(path, str) else "—"
+            parts.append(f"| {link} | {cell} |\n")
     elif isinstance(entrypoint, str) and entrypoint.strip():
         parts.append("\n## Entrypoint\n\n")
-        parts.append(f"Primary document: `{entrypoint.strip()}`\n")
+        parts.append(f"Primary document: {md_file_link(entrypoint)}\n")
 
     toc = data.get("toc")
     if isinstance(toc, list) and toc:
@@ -119,7 +128,7 @@ def build_readme(data: dict[str, Any]) -> str:
                 sections = item.get("sections")
                 if not isinstance(sections, list):
                     continue
-                parts.append(f"### `{doc}`\n\n")
+                parts.append(f"### {md_file_link(doc)}\n\n")
                 for line in render_section_tree(sections):
                     parts.append(line + "\n")
                 parts.append("\n")
