@@ -30,14 +30,19 @@ jobs:
           PYTHONPATH: ${{ github.workspace }}/workshop-metadata-tools
         run: python "${GITHUB_WORKSPACE}/workshop-metadata-tools/sync_metadata_toc.py"
 
-      - name: Ensure metadata.yaml matches committed version
+      - name: Generate README.md from metadata.yaml
+        env:
+          PYTHONPATH: ${{ github.workspace }}/workshop-metadata-tools
+        run: python "${GITHUB_WORKSPACE}/workshop-metadata-tools/generate_readme.py"
+
+      - name: Ensure generated files match committed version
         run: |
-          if git status --porcelain -- metadata.yaml | grep -q .; then
-            echo "::error::metadata.yaml is missing, or its toc is out of date with markdown headings."
-            echo "Clone https://github.com/Manta-Epitech-Academy/workshop-metadata-tools and run from your workshop root:"
-            echo "  pip install -r workshop-metadata-tools/requirements.txt"
-            echo "  PYTHONPATH=workshop-metadata-tools python workshop-metadata-tools/sync_metadata_toc.py"
-            git diff -- metadata.yaml || true
+          if git status --porcelain -- metadata.yaml README.md | grep -q .; then
+            echo "::error::metadata.yaml and/or README.md are out of date."
+            echo "From your workshop root, with workshop-metadata-tools on PYTHONPATH:"
+            echo "  python workshop-metadata-tools/sync_metadata_toc.py"
+            echo "  python workshop-metadata-tools/generate_readme.py"
+            git diff -- metadata.yaml README.md || true
             exit 1
           fi
 

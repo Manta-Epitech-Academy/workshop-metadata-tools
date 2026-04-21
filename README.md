@@ -1,6 +1,6 @@
 # workshop-metadata-tools
 
-Shared Python tooling for [Epitech Academy](https://epitech.academy) workshop repositories: validate `metadata.yaml`, keep the **`toc`** in sync with Markdown headings, and check competency codes (`cf_code`) against observables.
+Shared Python tooling for [Epitech Academy](https://epitech.academy) workshop repositories: validate `metadata.yaml`, keep the **`toc`** in sync with Markdown headings, generate **`README.md`** from metadata, and check competency codes (`cf_code`) against observables.
 
 Workshop repos (created from the subject template) only contain `metadata.yaml`, `metadata.schema.json`, and `.md` sources. **CI checks out this repository** next to the workshop and runs the scripts from here.
 
@@ -9,6 +9,7 @@ Workshop repos (created from the subject template) only contain `metadata.yaml`,
 | Script | Role |
 |--------|------|
 | `sync_metadata_toc.py` | Creates a default `metadata.yaml` if missing, or regenerates **`toc`** from `documents` / headings; validates against `metadata.schema.json`. |
+| `generate_readme.py` | Writes **`README.md`** from `metadata.yaml` (title, summary, authors, runtime, documents, toc outline, observables). |
 | `check_toc.py` | Ensures `toc` matches headings and validates `cf_code` / observables. |
 | `generate_toc.py` | Prints a `toc` YAML fragment from one or more `.md` files (optional helper). |
 | `toc_lib.py` | Shared heading extraction and TOC tree logic. |
@@ -22,6 +23,7 @@ git clone https://github.com/Manta-Epitech-Academy/workshop-metadata-tools.git
 pip install -r workshop-metadata-tools/requirements.txt
 export PYTHONPATH="$PWD/workshop-metadata-tools"
 python workshop-metadata-tools/sync_metadata_toc.py
+python workshop-metadata-tools/generate_readme.py
 python workshop-metadata-tools/check_toc.py
 ```
 
@@ -33,4 +35,4 @@ Workshop repositories call the reusable workflow:
 
 `Manta-Epitech-Academy/workshop-metadata-tools/.github/workflows/verify-metadata-reusable.yml@main`
 
-See the workshop template README for the exact snippet.
+See the workshop template (`TEMPLATE.md` / `README.md`) for the exact workflow snippet.
