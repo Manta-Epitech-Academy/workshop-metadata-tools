@@ -5,6 +5,8 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from quiz_lib import strip_quiz_blocks
+
 HEADING_RE = re.compile(r"^(#{1,6})\s+(.+?)\s*#*\s*$")
 
 
@@ -26,6 +28,7 @@ def strip_fenced_blocks(text: str) -> str:
 def extract_heading_lines(text: str) -> list[tuple[int, str]]:
     """Return (level, title) for each ATX heading, in order. Level is 1..6."""
     clean = strip_fenced_blocks(text)
+    clean = strip_quiz_blocks(clean)
     result: list[tuple[int, str]] = []
     for line in clean.splitlines():
         m = HEADING_RE.match(line.rstrip())

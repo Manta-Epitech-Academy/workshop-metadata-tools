@@ -148,6 +148,7 @@ Scripts are maintained in the shared repository [**workshop-metadata-tools**](ht
 | `sync_metadata_toc.py` | Creates or updates **`metadata.yaml`**, including regenerating **`toc`** from Markdown headings. |
 | `generate_readme.py` | Writes **`README.md`** from `metadata.yaml` (project, authors, runtime, documents, toc outline, observables). |
 | `check_toc.py` | Loads `metadata.yaml`, resolves each `toc` document path, recomputes heading trees from disk, and compares them to **`sections`**. Validates every listed document in one run. |
+| `parse_quiz.py` / `quiz_lib.py` | Parses **quiz** blockquotes (`> QUIZ.…`); quizzes are stripped before TOC extraction — see **`docs/QUIZ.md`**. |
 
 ```mermaid
 sequenceDiagram

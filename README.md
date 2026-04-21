@@ -12,7 +12,9 @@ Workshop repositories hold **`metadata.yaml`**, generated **`README.md`**, and w
 | `generate_readme.py` | Writes **`README.md`** from `metadata.yaml` (title, summary, authors, runtime, documents, toc outline, observables). |
 | `check_toc.py` | Ensures `toc` matches headings and validates `cf_code` / observables. |
 | `generate_toc.py` | Prints a `toc` YAML fragment from one or more `.md` files (optional helper). |
-| `toc_lib.py` | Shared heading extraction and TOC tree logic. |
+| `parse_quiz.py` | Prints quiz blocks in a Markdown file as JSON (see `docs/QUIZ.md`). |
+| `toc_lib.py` | Heading extraction, TOC tree, and `strip_quiz_blocks` (quizzes excluded from TOC). |
+| `quiz_lib.py` | Parse quizzes; used by `toc_lib` and `parse_quiz.py`. |
 
 ## Local use (from a workshop repository)
 
@@ -25,6 +27,7 @@ export PYTHONPATH="$PWD/workshop-metadata-tools"
 python workshop-metadata-tools/sync_metadata_toc.py
 python workshop-metadata-tools/generate_readme.py
 python workshop-metadata-tools/check_toc.py
+python workshop-metadata-tools/parse_quiz.py WORKSHOP.md   # optional: list quizzes as JSON
 ```
 
 Or with an absolute path to `workshop-metadata-tools` and `PYTHONPATH` set to that directory.
@@ -39,7 +42,8 @@ Canonical file: [`metadata.schema.json`](metadata.schema.json) (published at
 ## Documentation
 
 - [`docs/STRUCTURE.md`](docs/STRUCTURE.md) — metadata model, diagrams (Mermaid), and layout.
-- [`docs/structure-diagrams.html`](docs/structure-diagrams.html) — same diagrams in a browser (open locally).
+- [`docs/QUIZ.md`](docs/QUIZ.md) — quiz blocks in Markdown (not in `metadata.yaml` / `toc`).
+- [`docs/structure-diagrams.html`](docs/structure-diagrams.html) — same diagrams as STRUCTURE in a browser (open locally).
 
 ## CI
 
