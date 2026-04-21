@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Extract quiz blocks from Markdown and print JSON (see docs/QUIZ.md)."""
+"""Extract quiz blocks from Markdown and print JSON (see docs/QUIZ.md).
+
+Free-form quizzes expose ``freeform_prompt`` (text inside ``- […]:``).
+"""
 
 from __future__ import annotations
 

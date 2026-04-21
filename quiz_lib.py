@@ -17,6 +17,8 @@ QUIZ_HEADER_RE = re.compile(
 
 HEADING_ATX_RE = re.compile(r"^\s*#{1,6}\s")
 LIST_ITEM_RE = re.compile(r"^\s*([-*])\s+(.+)$")
+# Free form: exactly one list row — prompt in brackets, line ends with ':'
+FREE_FORM_PROMPT_RE = re.compile(r"^\s*-\s+\[(.+)\]\s*:\s*$")
 
 QuizType = Literal["single", "multiple", "match", "freeform"]
 
@@ -50,17 +52,13 @@ def _find_quiz_block_end(lines: list[str], start: int) -> int:
     if line.lstrip().startswith(">"):
         return i
 
+    if FREE_FORM_PROMPT_RE.match(line):
+        return i + 1
+
     if LIST_ITEM_RE.match(line):
         return _consume_list_body(lines, i)
 
-    while i < n:
-        line = lines[i]
-        if QUIZ_HEADER_RE.match(line):
-            return i
-        if HEADING_ATX_RE.match(line):
-            return i
-        i += 1
-    return n
+    return i
 
 
 def _consume_list_body(lines: list[str], start: int) -> int:
@@ -152,7 +150,20 @@ def _parse_quiz_block(block: list[str]) -> dict[str, Any]:
         i += 1
 
     if i >= len(block):
-        return _quiz_dict(level, qid, title, q_lines, "freeform", [], "")
+        return _quiz_dict(level, qid, title, q_lines, "freeform", [], "", None)
+
+    fm = FREE_FORM_PROMPT_RE.match(block[i])
+    if fm:
+        return _quiz_dict(
+            level,
+            qid,
+            title,
+            q_lines,
+            "freeform",
+            [],
+            "",
+            fm.group(1).strip(),
+        )
 
     if LIST_ITEM_RE.match(block[i]):
         items: list[dict[str, str]] = []
@@ -174,7 +185,7 @@ def _parse_quiz_block(block: list[str]) -> dict[str, Any]:
                 continue
             break
         qtype = _classify_list_type(items)
-        entry = _quiz_dict(level, qid, title, q_lines, qtype, items, "")
+        entry = _quiz_dict(level, qid, title, q_lines, qtype, items, "", None)
         if qtype == "match":
             entry["match_left"] = [
                 it for it in items if len(it.get("letter", "")) == 1 and it["letter"].isupper()
@@ -184,9 +195,7 @@ def _parse_quiz_block(block: list[str]) -> dict[str, Any]:
             ]
         return entry
 
-    body_lines = block[i:]
-    body = "\n".join(body_lines).rstrip()
-    return _quiz_dict(level, qid, title, q_lines, "freeform", [], body)
+    return _quiz_dict(level, qid, title, q_lines, "freeform", [], "", None)
 
 
 def _quiz_dict(
@@ -197,8 +206,9 @@ def _quiz_dict(
     qtype: QuizType,
     items: list[dict[str, str]],
     body: str,
+    freeform_prompt: str | None,
 ) -> dict[str, Any]:
-    return {
+    out: dict[str, Any] = {
         "level": level,
         "qid": qid,
         "title": title,
@@ -206,7 +216,13 @@ def _quiz_dict(
         "type": qtype,
         "items": items,
         "freeform_body": body,
+        "freeform_prompt": freeform_prompt,
     }
+    if freeform_prompt is None:
+        del out["freeform_prompt"]
+    if not body:
+        del out["freeform_body"]
+    return out
 
 
 def parse_quizzes(text: str) -> list[dict[str, Any]]:

@@ -26,7 +26,7 @@ Quizzes are written in **Markdown** using blockquotes. They are **not** reflecte
    | Single choice | List with **`-`** and `Letter.` prefixes | `single` |
    | Multiple choice | List with **`*`** and `Letter.` prefixes | `multiple` |
    | Match pairs | List with **`-`** and **uppercase** `Letter.` rows plus **lowercase** `letter.` rows | `match` |
-   | Free form | No list; optional prose after a blank line | `freeform` |
+   | Free form | **One** list item: **`- [prompt]:`** | `freeform` |
 
 4. **Correct answers** — **not** specified in this version (reserved for a later format).
 
@@ -75,14 +75,22 @@ Use **hyphen** lists: **uppercase** letters label one column, **lowercase** the 
 
 ## Free form
 
-After the question blockquotes, add a blank line (optional) and **non-list** lines until the next quiz, ATX heading (`#`), or end of file:
+Exactly **one** list line in this shape (prompt may be any text; it must not contain `]`):
+
+```markdown
+- [Your prompt or label here]:
+```
+
+Example:
 
 ```markdown
 > QUIZ.C1.1 Essay
 > Name the main designer of the C language.
 
-Write a short paragraph in the space below.
+- [Short paragraph]:
 ```
+
+JSON output includes `freeform_prompt` with the text inside the brackets.
 
 ## End of a quiz block
 
@@ -92,7 +100,7 @@ A quiz ends when the next line starts:
 - an ATX heading (`#` … `######`), or
 - end of file.
 
-List bodies end at the first blank line **not** followed by another list item.
+For list-based bodies (single / multiple / match), the block ends at the first blank line **not** followed by another list item. For **free form**, the body is **only** the single `- […]:` line.
 
 ## Tooling
 
@@ -102,6 +110,6 @@ From the workshop root (with `workshop-metadata-tools` on `PYTHONPATH`):
 python workshop-metadata-tools/parse_quiz.py path/to/WORKSHOP.md
 ```
 
-Prints a JSON array of quiz objects (`level`, `qid`, `title`, `question`, `type`, `items`, `freeform_body`, etc.).
+Prints a JSON array of quiz objects (`level`, `qid`, `title`, `question`, `type`, `items`, `freeform_prompt` for free-form quizzes, etc.).
 
 `toc_lib.strip_quiz_blocks` removes quizzes before heading extraction so quizzes never appear in `metadata.yaml` / `toc`.
