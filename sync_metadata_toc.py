@@ -41,6 +41,17 @@ except ImportError:
 from toc_lib import markdown_to_toc_nodes
 
 
+def resolve_schema_path(repo_root: Path) -> Path | None:
+    """Prefer `metadata.schema.json` in the workshop repo; else bundled in this package."""
+    local = repo_root / "metadata.schema.json"
+    if local.is_file():
+        return local.resolve()
+    bundled = Path(__file__).resolve().parent / "metadata.schema.json"
+    if bundled.is_file():
+        return bundled.resolve()
+    return None
+
+
 def resolve_repo_root(metadata_path: Path, explicit: Path | None) -> Path:
     if explicit is not None:
         return explicit.resolve()
@@ -312,9 +323,12 @@ def main() -> None:
 
     metadata_path = args.metadata.resolve()
     root = resolve_repo_root(metadata_path, args.root)
-    schema_path = (root / "metadata.schema.json").resolve()
-    if not schema_path.is_file():
-        print(f"sync_metadata_toc: missing schema at {schema_path}", file=sys.stderr)
+    schema_path = resolve_schema_path(root)
+    if schema_path is None:
+        print(
+            "sync_metadata_toc: no metadata.schema.json in workshop root and no bundled schema",
+            file=sys.stderr,
+        )
         sys.exit(2)
 
     yaml_api = YAML()

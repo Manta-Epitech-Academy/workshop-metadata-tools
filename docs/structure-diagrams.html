@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Repository structure — diagram gallery</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --surface: #1a2332;
+      --text: #e7ecf3;
+      --muted: #8b9cb3;
+      --accent: #5c9fd4;
+      --border: #2d3a4d;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    header {
+      padding: 2rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
+    header h1 { margin: 0 0 0.5rem; font-size: 1.35rem; font-weight: 650; }
+    header p { margin: 0; color: var(--muted); font-size: 0.95rem; max-width: 52rem; }
+    nav {
+      margin-top: 1rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem 1rem;
+      font-size: 0.85rem;
+    }
+    nav a { color: var(--accent); text-decoration: none; }
+    nav a:hover { text-decoration: underline; }
+    main { max-width: 56rem; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+    section.diagram {
+      margin-bottom: 3rem;
+      padding: 1.5rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+    }
+    section.diagram h2 {
+      margin: 0 0 0.35rem;
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+    section.diagram .caption {
+      margin: 0 0 1.25rem;
+      font-size: 0.88rem;
+      color: var(--muted);
+    }
+    .mermaid {
+      display: flex;
+      justify-content: center;
+      overflow-x: auto;
+    }
+    footer {
+      padding: 1.5rem;
+      text-align: center;
+      font-size: 0.8rem;
+      color: var(--muted);
+      border-top: 1px solid var(--border);
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Repository structure — flowchart gallery</h1>
+    <p>
+      Interactive view of the diagrams defined in <code>STRUCTURE.md</code>.
+      Open this file in a browser (double-click, or <code>xdg-open structure-diagrams.html</code>).
+    </p>
+    <nav>
+      <span style="color:var(--muted)">Jump:</span>
+      <a href="#d1">§1 Repo &amp; metadata</a>
+      <a href="#d2">§2 Metadata sections</a>
+      <a href="#d3">§3 Documents</a>
+      <a href="#d4">§4 Entrypoint / TOC</a>
+      <a href="#d5">§5 TOC entries</a>
+      <a href="#d6">§6 Tooling</a>
+      <a href="#d7">§7 Overview</a>
+    </nav>
+  </header>
+  <main>
+    <section class="diagram" id="d1">
+      <h2>1. One repository, one metadata file</h2>
+      <p class="caption">Manifest describes markdown files; JSON Schema validates the manifest.</p>
+      <div class="mermaid">
+flowchart LR
+  subgraph repo["Git repository"]
+    M["metadata.yaml"]
+    A["*.md files"]
+    S["metadata.schema.json"]
+  end
+  M -->|"describes"| A
+  S -->|"validates"| M
+      </div>
+    </section>
+
+    <section class="diagram" id="d2">
+      <h2>2. Contents of metadata.yaml</h2>
+      <p class="caption">Top-level sections and how they relate to entrypoint, documents, and TOC.</p>
+      <div class="mermaid">
+flowchart TB
+  subgraph meta["metadata.yaml"]
+    SV["schema_version"]
+    P["project"]
+    A["authors optional"]
+    R["runtime"]
+    D["documents optional"]
+    T["toc required"]
+  end
+  P --> EP["entrypoint: primary .md"]
+  D --> DOC["path + optional depends_on"]
+  T --> TD["one block per markdown file"]
+      </div>
+    </section>
+
+    <section class="diagram" id="d3">
+      <h2>3. Documents and prerequisites</h2>
+      <p class="caption">Optional <code>depends_on</code>: read source before target.</p>
+      <div class="mermaid">
+flowchart LR
+  subgraph documents["documents[]"]
+    D1["path: A.md"]
+    D2["path: B.md"]
+  end
+  D1 -->|"depends_on"| D2
+      </div>
+    </section>
+
+    <section class="diagram" id="d4">
+      <h2>4. Entrypoint vs documents vs TOC</h2>
+      <p class="caption">Three roles: default file, declared graph, navigation outline.</p>
+      <div class="mermaid">
+flowchart TB
+  EP["project.entrypoint\none primary .md"]
+  DS["documents[]\n0..n paths + optional depends_on"]
+  TOC["toc[]\n1 entry per .md in multi-doc mode"]
+  EP -.->|"usually also listed in"| DS
+  TOC -->|"document field"| MD1["first .md"]
+  TOC --> MD2["second .md"]
+      </div>
+    </section>
+
+    <section class="diagram" id="d5">
+      <h2>5. TOC: one entry per document</h2>
+      <p class="caption">Each <code>toc</code> item binds a file path to a heading tree.</p>
+      <div class="mermaid">
+flowchart TB
+  subgraph toc["toc"]
+    E1["entry 1: document + sections"]
+    E2["entry 2: document + sections"]
+  end
+  subgraph e1["entry 1"]
+    D1["document: WORKSHOP.md"]
+    S1["sections: H1 → H2 → H3 tree"]
+  end
+  E1 --> e1
+      </div>
+    </section>
+
+    <section class="diagram" id="d6">
+      <h2>6. Tooling sequence</h2>
+      <p class="caption">How <code>generate_toc.py</code> and <code>check_toc.py</code> (in <a href="https://github.com/Manta-Epitech-Academy/workshop-metadata-tools">workshop-metadata-tools</a>) interact with files.</p>
+      <div class="mermaid">
+sequenceDiagram
+  participant Gen as generate_toc.py
+  participant MD as *.md
+  participant Meta as metadata.yaml
+  participant Chk as check_toc.py
+  MD->>Gen: headings
+  Gen->>Meta: toc YAML fragment
+  Meta->>Chk: read toc + paths
+  MD->>Chk: read files
+  Chk->>Chk: compare trees
+      </div>
+    </section>
+
+    <section class="diagram" id="d7">
+      <h2>7. End-to-end overview</h2>
+      <p class="caption">Single-page mental model: repo → metadata → documents &amp; navigation.</p>
+      <div class="mermaid">
+flowchart TB
+  R["Repository"]
+  R --> M["metadata.yaml"]
+  M --> P["project.entrypoint\n(primary .md)"]
+  M --> DOC["documents[]\noptional + depends_on"]
+  M --> T["toc[]\n1 entry per outlined .md"]
+  T --> S1["sections tree\nfile 1"]
+  T --> S2["sections tree\nfile 2"]
+  DOC -.->|"paths should align"| T
+      </div>
+    </section>
+  </main>
+  <footer>
+    Source: <code>STRUCTURE.md</code> · Mermaid.js · theme: dark (neutral)
+  </footer>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: "dark",
+      themeVariables: {
+        primaryColor: "#2d3a4d",
+        primaryTextColor: "#e7ecf3",
+        primaryBorderColor: "#5c9fd4",
+        lineColor: "#8b9cb3",
+        secondaryColor: "#1a2332",
+        tertiaryColor: "#0f1419"
+      },
+      flowchart: { curve: "basis", padding: 12 },
+      sequence: { actorMargin: 48, boxMargin: 8 }
+    });
+  </script>
+</body>
+</html>

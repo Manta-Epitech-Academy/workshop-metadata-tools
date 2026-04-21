@@ -2,7 +2,7 @@
 
 Shared Python tooling for [Epitech Academy](https://epitech.academy) workshop repositories: validate `metadata.yaml`, keep the **`toc`** in sync with Markdown headings, generate **`README.md`** from metadata, and check competency codes (`cf_code`) against observables.
 
-Workshop repos (created from the subject template) only contain `metadata.yaml`, `metadata.schema.json`, and `.md` sources. **CI checks out this repository** next to the workshop and runs the scripts from here.
+Workshop repositories hold **`metadata.yaml`**, generated **`README.md`**, and workshop **`.md`** files only. The JSON Schema lives **here** (`metadata.schema.json`); editors point at it via the `$schema` URL in `metadata.yaml` (see the workshop template). **CI checks out this repository** next to the workshop and runs the scripts from here.
 
 ## Scripts
 
@@ -28,6 +28,18 @@ python workshop-metadata-tools/check_toc.py
 ```
 
 Or with an absolute path to `workshop-metadata-tools` and `PYTHONPATH` set to that directory.
+
+You may add a copy of `metadata.schema.json` at the workshop root to override the bundled schema for local experiments; otherwise `sync_metadata_toc.py` uses the schema from this repo.
+
+## JSON Schema
+
+Canonical file: [`metadata.schema.json`](metadata.schema.json) (published at  
+`https://raw.githubusercontent.com/Manta-Epitech-Academy/workshop-metadata-tools/main/metadata.schema.json`).
+
+## Documentation
+
+- [`docs/STRUCTURE.md`](docs/STRUCTURE.md) — metadata model, diagrams (Mermaid), and layout.
+- [`docs/structure-diagrams.html`](docs/structure-diagrams.html) — same diagrams in a browser (open locally).
 
 ## CI
 
