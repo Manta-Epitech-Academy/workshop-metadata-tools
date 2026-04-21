@@ -1,0 +1,47 @@
+# Reusable workflow: run from workshop repositories via `workflow_call`.
+name: Verify metadata
+
+on:
+  workflow_call:
+
+jobs:
+  metadata:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out workshop repository
+        uses: actions/checkout@v4
+
+      - name: Check out workshop-metadata-tools
+        uses: actions/checkout@v4
+        with:
+          repository: Manta-Epitech-Academy/workshop-metadata-tools
+          path: workshop-metadata-tools
+          ref: main
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r "${GITHUB_WORKSPACE}/workshop-metadata-tools/requirements.txt"
+
+      - name: Sync metadata.yaml (create default if missing, refresh toc)
+        env:
+          PYTHONPATH: ${{ github.workspace }}/workshop-metadata-tools
+        run: python "${GITHUB_WORKSPACE}/workshop-metadata-tools/sync_metadata_toc.py"
+
+      - name: Ensure metadata.yaml matches committed version
+        run: |
+          if git status --porcelain -- metadata.yaml | grep -q .; then
+            echo "::error::metadata.yaml is missing, or its toc is out of date with markdown headings."
+            echo "Clone https://github.com/Manta-Epitech-Academy/workshop-metadata-tools and run from your workshop root:"
+            echo "  pip install -r workshop-metadata-tools/requirements.txt"
+            echo "  PYTHONPATH=workshop-metadata-tools python workshop-metadata-tools/sync_metadata_toc.py"
+            git diff -- metadata.yaml || true
+            exit 1
+          fi
+
+      - name: Verify toc vs markdown and cf_code rules
+        env:
+          PYTHONPATH: ${{ github.workspace }}/workshop-metadata-tools
+        run: python "${GITHUB_WORKSPACE}/workshop-metadata-tools/check_toc.py"
