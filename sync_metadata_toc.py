@@ -4,8 +4,8 @@
 - If metadata.yaml is missing, writes a schema-shaped default (including `documents`
   and generated `toc`).
 - If it exists, rebuilds `toc` for every path in `documents` (or `project.entrypoint`
-  when `documents` is absent), preserving existing `cf_code` values where the title
-  path still matches.
+  when `documents` is absent), preserving existing `cf_code`, `competency_path`, and
+  `competency` values where the title path still matches.
 """
 
 from __future__ import annotations
@@ -116,11 +116,11 @@ def document_paths_from_metadata(data: dict[str, Any]) -> list[str]:
     )
 
 
-def collect_cf_by_title_path(
+def collect_preserved_toc_fields(
     sections: list[Any], prefix: tuple[str, ...] = ()
-) -> dict[tuple[str, ...], list[Any]]:
-    """Map title path (from root of that document's section tree) -> cf_code list."""
-    out: dict[tuple[str, ...], list[Any]] = {}
+) -> dict[tuple[str, ...], dict[str, Any]]:
+    """Map title path -> preserved keys (cf_code, competency_path, competency)."""
+    out: dict[tuple[str, ...], dict[str, Any]] = {}
     for node in sections:
         if not isinstance(node, dict):
             continue
@@ -128,18 +128,26 @@ def collect_cf_by_title_path(
         if not isinstance(title, str):
             continue
         path = prefix + (title,)
-        cf = node.get("cf_code")
-        if isinstance(cf, list):
-            out[path] = list(cf)
+        bag: dict[str, Any] = {}
+        if isinstance(node.get("cf_code"), list):
+            bag["cf_code"] = list(node["cf_code"])
+        if isinstance(node.get("competency_path"), list):
+            bag["competency_path"] = list(node["competency_path"])
+        if isinstance(node.get("competency"), list) and node["competency"]:
+            bag["competency"] = [
+                dict(x) for x in node["competency"] if isinstance(x, dict)
+            ]
+        if bag:
+            out[path] = bag
         parts = node.get("parts")
         if isinstance(parts, list) and parts:
-            out.update(collect_cf_by_title_path(parts, path))
+            out.update(collect_preserved_toc_fields(parts, path))
     return out
 
 
-def apply_preserved_cf(
+def apply_preserved_toc_fields(
     sections: list[dict[str, Any]],
-    cf_map: dict[tuple[str, ...], list[Any]],
+    bag_map: dict[tuple[str, ...], dict[str, Any]],
     prefix: tuple[str, ...] = (),
 ) -> None:
     for node in sections:
@@ -147,13 +155,22 @@ def apply_preserved_cf(
         if not isinstance(title, str):
             continue
         path = prefix + (title,)
-        if path in cf_map:
-            node["cf_code"] = cf_map[path]
-        elif "cf_code" not in node:
-            node["cf_code"] = []
+        bag = bag_map.get(path)
+        if bag:
+            if "cf_code" in bag:
+                node["cf_code"] = bag["cf_code"]
+            elif "cf_code" not in node:
+                node["cf_code"] = []
+            if "competency_path" in bag:
+                node["competency_path"] = bag["competency_path"]
+            if "competency" in bag:
+                node["competency"] = bag["competency"]
+        else:
+            if "cf_code" not in node:
+                node["cf_code"] = []
         parts = node.get("parts")
         if isinstance(parts, list) and parts:
-            apply_preserved_cf(parts, cf_map, path)
+            apply_preserved_toc_fields(parts, bag_map, path)
 
 
 def build_toc_for_documents(
@@ -161,12 +178,12 @@ def build_toc_for_documents(
     doc_paths: list[str],
     previous_toc: list[Any] | None,
 ) -> list[dict[str, Any]]:
-    """Multi-document toc entries with merged cf_code from previous_toc.
+    """Multi-document toc entries with merged toc bindings from previous_toc.
 
     `base_dir` is the directory that contains `metadata.yaml`; paths in `documents`
     are resolved relative to it (same as check_toc.py).
     """
-    prev_by_doc: dict[str, dict[tuple[str, ...], list[Any]]] = {}
+    prev_by_doc: dict[str, dict[tuple[str, ...], dict[str, Any]]] = {}
     if isinstance(previous_toc, list):
         for item in previous_toc:
             if not isinstance(item, dict):
@@ -174,7 +191,7 @@ def build_toc_for_documents(
             doc = item.get("document")
             secs = item.get("sections")
             if isinstance(doc, str) and isinstance(secs, list):
-                prev_by_doc[doc.strip()] = collect_cf_by_title_path(secs)
+                prev_by_doc[doc.strip()] = collect_preserved_toc_fields(secs)
 
     out: list[dict[str, Any]] = []
     for rel in doc_paths:
@@ -185,8 +202,8 @@ def build_toc_for_documents(
             )
         text = md.read_text(encoding="utf-8")
         sections = markdown_to_toc_nodes(text)
-        cf_map = prev_by_doc.get(rel, {})
-        apply_preserved_cf(sections, cf_map)
+        bag_map = prev_by_doc.get(rel, {})
+        apply_preserved_toc_fields(sections, bag_map)
         out.append({"document": rel, "sections": sections})
     return out
 

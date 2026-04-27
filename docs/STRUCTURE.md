@@ -115,7 +115,7 @@ flowchart TB
 In the **current (multi-document) model**, `toc` is a **list of objects**, each with:
 
 - **`document`**: path to a `.md` file (same path convention as elsewhere).
-- **`sections`**: a **tree of headings** extracted from that file (`title`, `cf_code`, nested `parts`), mirroring `#` / `##` / `###` … structure in the markdown.
+- **`sections`**: a **tree of headings** extracted from that file (`title`, optional `cf_code`, optional `competency_path` / `competency`, nested `parts`), mirroring `#` / `##` / `###` … structure in the markdown. See [`competency_path_notation.md`](competency_path_notation.md).
 
 ```mermaid
 flowchart TB
