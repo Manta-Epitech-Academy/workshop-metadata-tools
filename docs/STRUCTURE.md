@@ -140,7 +140,7 @@ For older data, `toc` may be a **flat list of sections** (no `document` / `secti
 
 ## 6. Tooling
 
-Scripts are maintained in the shared repository [**workshop-metadata-tools**](https://github.com/Manta-Epitech-Academy/workshop-metadata-tools) (not copied into each workshop). Typical scripts:
+Scripts are maintained in the shared repository [**workshop-metadata-tools**](https://github.com/kevin-cazal/workshop-metadata-tools) (not copied into each workshop). Typical scripts:
 
 | Script | Role |
 |--------|------|
@@ -196,7 +196,7 @@ workshop-metadata-tools/       # shared tooling + JSON Schema + this doc
 └── …
 ```
 
-Shared Python tooling and schema: [**workshop-metadata-tools**](https://github.com/Manta-Epitech-Academy/workshop-metadata-tools).
+Shared Python tooling and schema: [**workshop-metadata-tools**](https://github.com/kevin-cazal/workshop-metadata-tools).
 
 ---
 
@@ -209,4 +209,4 @@ Shared Python tooling and schema: [**workshop-metadata-tools**](https://github.c
 | **Documents** | Zero or more declared `.md` paths, optionally with `depends_on` prerequisites. |
 | **TOC** | Required; in multi-document mode, **`toc` has one item per outlined `.md`**, each with `document` + `sections` matching headings in that file. |
 
-For field-level constraints (types, patterns, `oneOf` for legacy `toc`), see **`metadata.schema.json`** in the [**workshop-metadata-tools**](https://github.com/Manta-Epitech-Academy/workshop-metadata-tools) repository (or the `$schema` URL in your `metadata.yaml`).
+For field-level constraints (types, patterns, `oneOf` for legacy `toc`), see **`metadata.schema.json`** in the [**workshop-metadata-tools**](https://github.com/kevin-cazal/workshop-metadata-tools) repository (or the `$schema` URL in your `metadata.yaml`).

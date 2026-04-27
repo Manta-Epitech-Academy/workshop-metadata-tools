@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/Manta-Epitech-Academy/workshop-metadata-tools/main/metadata.schema.json",
+  "$id": "https://raw.githubusercontent.com/kevin-cazal/workshop-metadata-tools/main/metadata.schema.json",
   "title": "Workshop metadata",
   "type": "object",
   "additionalProperties": false,

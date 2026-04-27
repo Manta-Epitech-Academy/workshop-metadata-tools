@@ -21,7 +21,7 @@ Workshop repositories hold **`metadata.yaml`**, generated **`README.md`**, and w
 Clone this repo **next to** your workshop (or anywhere), then from the **workshop root** (where `metadata.yaml` lives):
 
 ```bash
-git clone https://github.com/Manta-Epitech-Academy/workshop-metadata-tools.git
+git clone https://github.com/kevin-cazal/workshop-metadata-tools.git
 pip install -r workshop-metadata-tools/requirements.txt
 export PYTHONPATH="$PWD/workshop-metadata-tools"
 python workshop-metadata-tools/sync_metadata_toc.py
@@ -37,7 +37,7 @@ You may add a copy of `metadata.schema.json` at the workshop root to override th
 ## JSON Schema
 
 Canonical file: [`metadata.schema.json`](metadata.schema.json) (published at  
-`https://raw.githubusercontent.com/Manta-Epitech-Academy/workshop-metadata-tools/main/metadata.schema.json`).
+`https://raw.githubusercontent.com/kevin-cazal/workshop-metadata-tools/main/metadata.schema.json`).
 
 ## Documentation
 
@@ -49,6 +49,6 @@ Canonical file: [`metadata.schema.json`](metadata.schema.json) (published at
 
 Workshop repositories call the reusable workflow:
 
-`Manta-Epitech-Academy/workshop-metadata-tools/.github/workflows/verify-metadata-reusable.yml@main`
+`kevin-cazal/workshop-metadata-tools/.github/workflows/verify-metadata-reusable.yml@main`
 
 See the workshop template (`TEMPLATE.md` / `README.md`) for the exact workflow snippet.
