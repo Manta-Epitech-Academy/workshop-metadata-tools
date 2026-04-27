@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Check that `toc` in metadata.yaml matches headings in each listed markdown file.
 
-Also validates structured `competency` refs on TOC nodes: domain, skill, level, project,
-obs_index, and (when `observables` is non-empty) observable_id declared in observables.
+Also validates `competency` hooks on TOC nodes: slash paths `/DOMAIN/SKILL/LEVEL/PROJECT/OBSINDEX`
+(see schema) or legacy structured objects; when `observables` is non-empty, path OBSINDEX must
+match an observable id `{project.slug}.OBSINDEX`.
 """
 
 from __future__ import annotations
@@ -21,16 +22,20 @@ except ImportError:
 
 from toc_lib import markdown_to_toc_nodes, toc_entries_from_metadata
 
+_COMP_PATH = re.compile(
+    r"^/([A-Z]+)/([0-9]+)/([A-Z][0-9]+)/([a-z][a-z0-9_-]*)/([1-9][0-9]*)$"
+)
+
 
 def collect_competency(
-    nodes: list[Any], out: list[tuple[dict[str, Any], str]]
+    nodes: list[Any], out: list[tuple[str | dict[str, Any], str]]
 ) -> None:
     for node in nodes:
         if not isinstance(node, dict):
             continue
         title = node.get("title", "?")
         for item in node.get("competency") or []:
-            if isinstance(item, dict):
+            if isinstance(item, (str, dict)):
                 out.append((item, title))
         collect_competency(node.get("parts") or [], out)
 
@@ -47,80 +52,132 @@ def _obs_index_ok(raw: Any) -> tuple[bool, str]:
     return False, "obs_index must be a positive integer"
 
 
+def _check_one_competency_dict(
+    ref: dict[str, Any],
+    location: str,
+    project_slug: str,
+    observable_ids: set[str],
+    require_obs: bool,
+) -> list[str]:
+    errors: list[str] = []
+    req = ("domain", "skill", "level", "project", "obs_index")
+    missing = [k for k in req if k not in ref]
+    if missing:
+        errors.append(
+            f"competency entry {ref!r} (in section {location!r}) missing keys: {', '.join(missing)}"
+        )
+        return errors
+    dom, sk, lv, proj, oix = (
+        ref["domain"],
+        ref["skill"],
+        ref["level"],
+        ref["project"],
+        ref["obs_index"],
+    )
+    if not isinstance(dom, str) or not re.fullmatch(r"[A-Z]+", dom):
+        errors.append(
+            f"competency.domain (in section {location!r}) must be uppercase letters, got {dom!r}"
+        )
+    if not isinstance(sk, str) or not re.fullmatch(r"[0-9]+", sk):
+        errors.append(
+            f"competency.skill (in section {location!r}) must be digits, got {sk!r}"
+        )
+    if not isinstance(lv, str) or not re.fullmatch(r"[A-Z][0-9]+", lv):
+        errors.append(
+            f"competency.level (in section {location!r}) must match e.g. A1, got {lv!r}"
+        )
+    if not isinstance(proj, str) or not re.fullmatch(r"[a-z][a-z0-9_-]*", proj):
+        errors.append(
+            f"competency.project (in section {location!r}) must be a slug, got {proj!r}"
+        )
+    ok, msg = _obs_index_ok(oix)
+    if not ok:
+        errors.append(f"competency.obs_index (in section {location!r}): {msg}")
+    if isinstance(proj, str) and proj != project_slug:
+        errors.append(
+            f"competency.project {proj!r} (in section {location!r}) must match"
+            f" metadata project.slug {project_slug!r}"
+        )
+
+    oid = ref.get("observable_id")
+    if require_obs:
+        if not isinstance(oid, str) or not oid.strip():
+            errors.append(
+                f"competency entry (in section {location!r}) must set observable_id"
+                " when observables are declared"
+            )
+        else:
+            if oid not in observable_ids:
+                errors.append(
+                    f"competency observable_id {oid!r} (in section {location!r}) is not"
+                    " declared under observables"
+                )
+            exp_prefix = f"{project_slug}."
+            if not oid.startswith(exp_prefix):
+                errors.append(
+                    f"competency observable_id {oid!r} (in section {location!r}) must start"
+                    f" with {exp_prefix!r}"
+                )
+    elif observable_ids and isinstance(oid, str) and oid.strip() and oid not in observable_ids:
+        errors.append(
+            f"competency observable_id {oid!r} (in section {location!r}) is not declared"
+            " under observables"
+        )
+    return errors
+
+
+def _check_one_competency_path(
+    path: str,
+    location: str,
+    project_slug: str,
+    observable_ids: set[str],
+    require_obs: bool,
+) -> list[str]:
+    errors: list[str] = []
+    m = _COMP_PATH.fullmatch(path.strip())
+    if not m:
+        errors.append(
+            f"competency path {path!r} (in section {location!r}) must match"
+            " /DOMAIN/SKILL/LEVEL/PROJECT/OBSINDEX (see metadata schema)"
+        )
+        return errors
+    dom, sk, lv, proj, obs_tail = m.group(1), m.group(2), m.group(3), m.group(4), m.group(5)
+    if proj != project_slug:
+        errors.append(
+            f"competency path project segment {proj!r} (in section {location!r}) must match"
+            f" metadata project.slug {project_slug!r}"
+        )
+    if require_obs:
+        oid = f"{project_slug}.{obs_tail}"
+        if oid not in observable_ids:
+            errors.append(
+                f"competency path {path!r} (in section {location!r}): observable {oid!r} is not"
+                " declared under observables"
+            )
+    return errors
+
+
 def check_competency_refs(
     entries: list[tuple[str, list[Any]]],
     project_slug: str,
     observable_ids: set[str],
 ) -> list[str]:
     errors: list[str] = []
-    collected: list[tuple[dict[str, Any], str]] = []
+    collected: list[tuple[str | dict[str, Any], str]] = []
     for _doc, sections in entries:
         collect_competency(sections, collected)
 
     require_obs = bool(observable_ids)
     for ref, location in collected:
-        req = ("domain", "skill", "level", "project", "obs_index")
-        missing = [k for k in req if k not in ref]
-        if missing:
-            errors.append(
-                f"competency entry {ref!r} (in section {location!r}) missing keys: {', '.join(missing)}"
+        if isinstance(ref, str):
+            errors.extend(_check_one_competency_path(ref, location, project_slug, observable_ids, require_obs))
+        elif isinstance(ref, dict):
+            errors.extend(
+                _check_one_competency_dict(ref, location, project_slug, observable_ids, require_obs)
             )
-            continue
-        dom, sk, lv, proj, oix = (
-            ref["domain"],
-            ref["skill"],
-            ref["level"],
-            ref["project"],
-            ref["obs_index"],
-        )
-        if not isinstance(dom, str) or not re.fullmatch(r"[A-Z]+", dom):
+        else:
             errors.append(
-                f"competency.domain (in section {location!r}) must be uppercase letters, got {dom!r}"
-            )
-        if not isinstance(sk, str) or not re.fullmatch(r"[0-9]+", sk):
-            errors.append(
-                f"competency.skill (in section {location!r}) must be digits, got {sk!r}"
-            )
-        if not isinstance(lv, str) or not re.fullmatch(r"[A-Z][0-9]+", lv):
-            errors.append(
-                f"competency.level (in section {location!r}) must match e.g. A1, got {lv!r}"
-            )
-        if not isinstance(proj, str) or not re.fullmatch(r"[a-z][a-z0-9_-]*", proj):
-            errors.append(
-                f"competency.project (in section {location!r}) must be a slug, got {proj!r}"
-            )
-        ok, msg = _obs_index_ok(oix)
-        if not ok:
-            errors.append(f"competency.obs_index (in section {location!r}): {msg}")
-        if isinstance(proj, str) and proj != project_slug:
-            errors.append(
-                f"competency.project {proj!r} (in section {location!r}) must match"
-                f" metadata project.slug {project_slug!r}"
-            )
-
-        oid = ref.get("observable_id")
-        if require_obs:
-            if not isinstance(oid, str) or not oid.strip():
-                errors.append(
-                    f"competency entry (in section {location!r}) must set observable_id"
-                    " when observables are declared"
-                )
-            else:
-                if oid not in observable_ids:
-                    errors.append(
-                        f"competency observable_id {oid!r} (in section {location!r}) is not"
-                        " declared under observables"
-                    )
-                exp_prefix = f"{project_slug}."
-                if not oid.startswith(exp_prefix):
-                    errors.append(
-                        f"competency observable_id {oid!r} (in section {location!r}) must start"
-                        f" with {exp_prefix!r}"
-                    )
-        elif observable_ids and isinstance(oid, str) and oid.strip() and oid not in observable_ids:
-            errors.append(
-                f"competency observable_id {oid!r} (in section {location!r}) is not declared"
-                " under observables"
+                f"competency entry {ref!r} (in section {location!r}) must be a string path or mapping"
             )
 
     return errors

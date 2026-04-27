@@ -124,8 +124,17 @@
         "title": { "type": "string", "minLength": 1 },
         "competency": {
           "type": "array",
-          "items": { "$ref": "#/$defs/CompetencyRef" },
-          "description": "Structured competency / grading hooks for this section (resolve path + optional workshop observable id)."
+          "items": {
+            "oneOf": [
+              {
+                "type": "string",
+                "pattern": "^/[A-Z]+/[0-9]+/[A-Z][0-9]+/[a-z][a-z0-9_-]*/[1-9][0-9]*$",
+                "description": "Canonical hook: /DOMAIN/SKILL/LEVEL/PROJECT/OBSINDEX — leading slash; SKILL is digits (e.g. 01); OBSINDEX is the 1-based workshop observable ordinal (same N as observables id `{project.slug}.N`), not necessarily the framework resolve bucket index."
+              },
+              { "$ref": "#/$defs/CompetencyRef" }
+            ]
+          },
+          "description": "Competency hooks: slash paths (preferred) or legacy structured refs. Path form ties to `observables` via `{project.slug}.{OBSINDEX}`."
         },
         "parts": {
           "type": "array",

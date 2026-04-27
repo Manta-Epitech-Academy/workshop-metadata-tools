@@ -130,9 +130,14 @@ def collect_preserved_toc_fields(
         path = prefix + (title,)
         bag: dict[str, Any] = {}
         if isinstance(node.get("competency"), list) and node["competency"]:
-            bag["competency"] = [
-                dict(x) for x in node["competency"] if isinstance(x, dict)
-            ]
+            preserved: list[Any] = []
+            for x in node["competency"]:
+                if isinstance(x, str) and x.strip():
+                    preserved.append(x)
+                elif isinstance(x, dict):
+                    preserved.append(dict(x))
+            if preserved:
+                bag["competency"] = preserved
         if bag:
             out[path] = bag
         parts = node.get("parts")
