@@ -1,30 +1,40 @@
-# Competency observable path (slash notation)
+# Competency references in the TOC (`competency`)
 
-Workshop tooling and the **[competency-framework](https://github.com/kevin-cazal/competency-framework)** API use a single **canonical path** for an observable inside a project workshop:
+Workshop metadata ties TOC sections to grading / API hooks using **structured objects only** (no legacy dot-codes, no parallel slash-string arrays).
 
-```text
-DOMAIN / skill_nn / LEVEL / project_slug / obs_index
+Each TOC node may include:
+
+```yaml
+competency:
+  - domain: PROG
+    skill: "01"
+    level: A1
+    project: pypong
+    obs_index: 1
+    observable_id: pypong.1
 ```
 
-Example mapping from legacy **`cf_code`** (`metadata.yaml`):
+## Fields
 
-| Legacy `cf_code` | Canonical slash path |
-|------------------|------------------------|
-| `PROG-01.A1.1`   | `PROG/01/A1/pypong/1`  |
+| Field | Meaning |
+|-------|---------|
+| `domain` | Uppercase domain (`PROG`, `TRANS`, …). |
+| `skill` | Skill number as digits (`01`, `1`, …). |
+| `level` | Level code (`A1`, `A2`, …). |
+| `project` | Workshop slug; must equal `project.slug` in `metadata.yaml`. |
+| `obs_index` | For **PROG** (and other framework-backed domains): the **`obs_num`** segment in `GET /api/v1/resolve/{domain}/{skill}/{level}/{project}/{obs_num}` from **[competency-framework](https://github.com/kevin-cazal/competency-framework)**. For **TRANS** (no API tree yet), use your workshop’s ordinal for that hook. |
+| `observable_id` | Required when this file declares **`observables`**: must be one of the declared ids (typically `{project.slug}.N`). |
 
-- **`skill_nn`**: digits only (`01`, `2`, …), not the full `PROG-01` id.
-- **`LEVEL`**: level code such as `A1`, `A2`.
-- **`obs_index`**: 1-based index within that skill’s observables for the same **level** and **project** (same segment as `GET /api/v1/resolve/.../{obs_num}` in competency-framework).
-- **`TRANS-*`** codes are not mapped in the framework tree yet; keep them as **`cf_code`** only until a TRANS domain exists.
+Equivalent **slash path** for display or URLs (PROG only):
 
-## In `metadata.yaml` (this fork)
+```text
+{domain}/{skill}/{level}/{project}/{obs_index}
+```
 
-`metadata.schema.json` allows, on each TOC node:
+Example: `PROG/01/A1/pypong/1` → `GET /api/v1/resolve/PROG/01/A1/pypong/1`.
 
-- **`cf_code`**: legacy list `DOMAIN-SKILL.LEVEL.OBS_NUM` (unchanged).
-- **`competency_path`**: list of slash strings (canonical); each path’s `project_slug` must equal `project.slug`.
-- **`competency`**: list of structured objects `{ domain, skill, level, project, obs_index }` (same meaning as one slash path).
+## `observables` and `observable_id`
 
-When **`observables`** is declared, **`cf_code`** still drives **`{project.slug}.N`** binding (last segment of each code → observable id). Use **`competency_path`** / **`competency`** alongside **`cf_code`** so tools and humans see the resolve path without duplicating observable prose.
+When `observables:` is present, **`check_toc.py`** requires every `competency` row to include **`observable_id`** and that id must appear in the `observables` list.
 
-Design discussion (upstream thread): [workshop-metadata-tools issue #1](https://github.com/Manta-Epitech-Academy/workshop-metadata-tools/issues/1).
+Design discussion (upstream): [workshop-metadata-tools issue #1](https://github.com/Manta-Epitech-Academy/workshop-metadata-tools/issues/1).

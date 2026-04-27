@@ -1,6 +1,6 @@
 # workshop-metadata-tools
 
-Shared Python tooling for [Epitech Academy](https://epitech.academy) workshop repositories: validate `metadata.yaml`, keep the **`toc`** in sync with Markdown headings, generate **`README.md`** from metadata, and check competency codes (`cf_code`) against observables.
+Shared Python tooling for [Epitech Academy](https://epitech.academy) workshop repositories: validate `metadata.yaml`, keep the **`toc`** in sync with Markdown headings, generate **`README.md`** from metadata, and check structured **`competency`** hooks against **`observables`** when declared.
 
 Workshop repositories hold **`metadata.yaml`**, generated **`README.md`**, and workshop **`.md`** files only. The JSON Schema lives **here** (`metadata.schema.json`); editors point at it via the `$schema` URL in `metadata.yaml` (see the workshop template). **CI checks out this repository** next to the workshop and runs the scripts from here.
 
@@ -10,7 +10,7 @@ Workshop repositories hold **`metadata.yaml`**, generated **`README.md`**, and w
 |--------|------|
 | `sync_metadata_toc.py` | Creates a default `metadata.yaml` if missing, or regenerates **`toc`** from `documents` / headings; validates against `metadata.schema.json`. |
 | `generate_readme.py` | Writes **`README.md`** from `metadata.yaml` (title, summary, authors, runtime, documents, toc outline, observables). |
-| `check_toc.py` | Ensures `toc` matches headings and validates `cf_code` / observables. |
+| `check_toc.py` | Ensures `toc` matches headings and validates `competency` / `observables`. |
 | `generate_toc.py` | Prints a `toc` YAML fragment from one or more `.md` files (optional helper). |
 | `parse_quiz.py` | Prints quiz blocks in a Markdown file as JSON (see `docs/QUIZ.md`). |
 | `toc_lib.py` | Heading extraction, TOC tree, and `strip_quiz_blocks` (quizzes excluded from TOC). |

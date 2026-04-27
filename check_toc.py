@@ -1,11 +1,8 @@
 #!/usr/bin/env python3
 """Check that `toc` in metadata.yaml matches headings in each listed markdown file.
 
-Also validates:
-- Every cf_code entry matches the pattern DOMAIN-SKILL.LEVEL.OBS_NUM.
-- Every OBS_NUM referenced in cf_code corresponds to a declared observable (when `observables` is non-empty).
-- Optional competency_path strings: DOMAIN/skill_nn/LEVEL/project_slug/obs_index; project slug must match metadata.
-- Optional structured competency[] objects: same contract as one slash path.
+Also validates structured `competency` refs on TOC nodes: domain, skill, level, project,
+obs_index, and (when `observables` is non-empty) observable_id declared in observables.
 """
 
 from __future__ import annotations
@@ -24,35 +21,8 @@ except ImportError:
 
 from toc_lib import markdown_to_toc_nodes, toc_entries_from_metadata
 
-CF_CODE_RE = re.compile(r"^[A-Z]+-\d+\.[A-Z]\d+\.(\d+)$")
-CANONICAL_PATH_RE = re.compile(
-    r"^([A-Z]+)/([0-9]+)/([A-Z][0-9]+)/([a-z][a-z0-9_-]*)/([0-9]+)$"
-)
 
-
-def collect_cf_codes(nodes: list[Any], out: list[tuple[str, str]]) -> None:
-    """Recursively collect (cf_code, location_title) pairs from a toc node tree."""
-    for node in nodes:
-        if not isinstance(node, dict):
-            continue
-        title = node.get("title", "?")
-        for code in node.get("cf_code") or []:
-            out.append((code, title))
-        collect_cf_codes(node.get("parts") or [], out)
-
-
-def collect_competency_paths(nodes: list[Any], out: list[tuple[str, str]]) -> None:
-    """Recursively collect (competency_path string, location_title)."""
-    for node in nodes:
-        if not isinstance(node, dict):
-            continue
-        title = node.get("title", "?")
-        for path in node.get("competency_path") or []:
-            out.append((path, title))
-        collect_competency_paths(node.get("parts") or [], out)
-
-
-def collect_competency_struct(
+def collect_competency(
     nodes: list[Any], out: list[tuple[dict[str, Any], str]]
 ) -> None:
     for node in nodes:
@@ -62,69 +32,10 @@ def collect_competency_struct(
         for item in node.get("competency") or []:
             if isinstance(item, dict):
                 out.append((item, title))
-        collect_competency_struct(node.get("parts") or [], out)
+        collect_competency(node.get("parts") or [], out)
 
 
-def check_cf_codes(
-    entries: list[tuple[str, list[Any]]],
-    observable_ids: set[str],
-    project_slug: str,
-) -> list[str]:
-    """Return a list of error messages (empty = all good)."""
-    errors: list[str] = []
-    all_codes: list[tuple[str, str]] = []
-    for _doc, sections in entries:
-        collect_cf_codes(sections, all_codes)
-
-    for code, location in all_codes:
-        m = CF_CODE_RE.match(code)
-        if not m:
-            errors.append(
-                f"cf_code {code!r} (in section {location!r}) does not match"
-                " DOMAIN-SKILL.LEVEL.OBS_NUM format"
-            )
-            continue
-        obs_num = m.group(1)
-        expected_id = f"{project_slug}.{obs_num}"
-        if observable_ids and expected_id not in observable_ids:
-            errors.append(
-                f"cf_code {code!r} (in section {location!r}) references observable"
-                f" {expected_id!r} which is not declared in observables"
-            )
-    return errors
-
-
-def check_competency_paths(
-    entries: list[tuple[str, list[Any]]],
-    project_slug: str,
-) -> list[str]:
-    errors: list[str] = []
-    collected: list[tuple[str, str]] = []
-    for _doc, sections in entries:
-        collect_competency_paths(sections, collected)
-    for path, location in collected:
-        if not isinstance(path, str):
-            errors.append(
-                f"competency_path entry (in section {location!r}) must be a string, got {type(path).__name__}"
-            )
-            continue
-        m = CANONICAL_PATH_RE.match(path)
-        if not m:
-            errors.append(
-                f"competency_path {path!r} (in section {location!r}) does not match"
-                " DOMAIN/skill_nn/LEVEL/project_slug/obs_index"
-            )
-            continue
-        slug = m.group(4)
-        if slug != project_slug:
-            errors.append(
-                f"competency_path {path!r} (in section {location!r}) uses project slug {slug!r}"
-                f" but metadata project.slug is {project_slug!r}"
-            )
-    return errors
-
-
-def _struct_obs_index_ok(raw: Any) -> tuple[bool, str]:
+def _obs_index_ok(raw: Any) -> tuple[bool, str]:
     if isinstance(raw, bool) or not isinstance(raw, (int, str)):
         return False, f"obs_index must be an integer, got {type(raw).__name__}"
     if isinstance(raw, str):
@@ -136,14 +47,17 @@ def _struct_obs_index_ok(raw: Any) -> tuple[bool, str]:
     return False, "obs_index must be a positive integer"
 
 
-def check_competency_struct(
+def check_competency_refs(
     entries: list[tuple[str, list[Any]]],
     project_slug: str,
+    observable_ids: set[str],
 ) -> list[str]:
     errors: list[str] = []
     collected: list[tuple[dict[str, Any], str]] = []
     for _doc, sections in entries:
-        collect_competency_struct(sections, collected)
+        collect_competency(sections, collected)
+
+    require_obs = bool(observable_ids)
     for ref, location in collected:
         req = ("domain", "skill", "level", "project", "obs_index")
         missing = [k for k in req if k not in ref]
@@ -152,7 +66,13 @@ def check_competency_struct(
                 f"competency entry {ref!r} (in section {location!r}) missing keys: {', '.join(missing)}"
             )
             continue
-        dom, sk, lv, proj, oix = (ref["domain"], ref["skill"], ref["level"], ref["project"], ref["obs_index"])
+        dom, sk, lv, proj, oix = (
+            ref["domain"],
+            ref["skill"],
+            ref["level"],
+            ref["project"],
+            ref["obs_index"],
+        )
         if not isinstance(dom, str) or not re.fullmatch(r"[A-Z]+", dom):
             errors.append(
                 f"competency.domain (in section {location!r}) must be uppercase letters, got {dom!r}"
@@ -169,7 +89,7 @@ def check_competency_struct(
             errors.append(
                 f"competency.project (in section {location!r}) must be a slug, got {proj!r}"
             )
-        ok, msg = _struct_obs_index_ok(oix)
+        ok, msg = _obs_index_ok(oix)
         if not ok:
             errors.append(f"competency.obs_index (in section {location!r}): {msg}")
         if isinstance(proj, str) and proj != project_slug:
@@ -177,6 +97,32 @@ def check_competency_struct(
                 f"competency.project {proj!r} (in section {location!r}) must match"
                 f" metadata project.slug {project_slug!r}"
             )
+
+        oid = ref.get("observable_id")
+        if require_obs:
+            if not isinstance(oid, str) or not oid.strip():
+                errors.append(
+                    f"competency entry (in section {location!r}) must set observable_id"
+                    " when observables are declared"
+                )
+            else:
+                if oid not in observable_ids:
+                    errors.append(
+                        f"competency observable_id {oid!r} (in section {location!r}) is not"
+                        " declared under observables"
+                    )
+                exp_prefix = f"{project_slug}."
+                if not oid.startswith(exp_prefix):
+                    errors.append(
+                        f"competency observable_id {oid!r} (in section {location!r}) must start"
+                        f" with {exp_prefix!r}"
+                    )
+        elif observable_ids and isinstance(oid, str) and oid.strip() and oid not in observable_ids:
+            errors.append(
+                f"competency observable_id {oid!r} (in section {location!r}) is not declared"
+                " under observables"
+            )
+
     return errors
 
 
@@ -257,13 +203,10 @@ def main() -> None:
         obs["id"] for obs in observables_raw if isinstance(obs, dict) and "id" in obs
     }
 
-    cf_errors = check_cf_codes(entries, observable_ids, project_slug)
-    path_errors = check_competency_paths(entries, project_slug)
-    struct_errors = check_competency_struct(entries, project_slug)
-    all_err = cf_errors + path_errors + struct_errors
-    for err in all_err:
+    errs = check_competency_refs(entries, project_slug, observable_ids)
+    for err in errs:
         print(f"FAIL: {err}", file=sys.stderr)
-    if all_err:
+    if errs:
         sys.exit(1)
 
     for doc_rel, yaml_sections in entries:

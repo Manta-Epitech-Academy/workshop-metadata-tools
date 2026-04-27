@@ -46,7 +46,7 @@ jobs:
             exit 1
           fi
 
-      - name: Verify toc vs markdown and cf_code rules
+      - name: Verify toc vs markdown and competency rules
         env:
           PYTHONPATH: ${{ github.workspace }}/workshop-metadata-tools
         run: python "${GITHUB_WORKSPACE}/workshop-metadata-tools/check_toc.py"

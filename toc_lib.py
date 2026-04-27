@@ -42,14 +42,14 @@ def extract_heading_lines(text: str) -> list[tuple[int, str]]:
 
 def headings_to_toc_nodes(headings: list[tuple[int, str]]) -> list[dict[str, Any]]:
     """
-    Build nested TOC nodes: {title, cf_code: [], parts?: [...]} from ordered (level, title).
+    Build nested TOC nodes: {title, parts?: [...]} from ordered (level, title).
     Same rules as HTML outline: deeper heading nests under the nearest higher-level open section.
     """
     roots: list[dict[str, Any]] = []
     stack: list[tuple[int, dict[str, Any]]] = []
 
     for level, title in headings:
-        node: dict[str, Any] = {"title": title, "cf_code": []}
+        node: dict[str, Any] = {"title": title}
 
         while stack and stack[-1][0] >= level:
             stack.pop()

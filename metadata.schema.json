@@ -122,28 +122,10 @@
       "required": ["title"],
       "properties": {
         "title": { "type": "string", "minLength": 1 },
-        "cf_code": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "pattern": "^[A-Z]+-\\d+\\.[A-Z]\\d+\\.\\d+$",
-            "description": "Legacy format: DOMAIN-SKILL_ID.LEVEL.OBS_NUM (e.g. PROG-01.A1.1). When `observables` is set, each code’s last segment still binds to `{project.slug}.N`."
-          },
-          "description": "Legacy competency codes tied to this section (can be empty)."
-        },
-        "competency_path": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "pattern": "^[A-Z]+/[0-9]+/[A-Z][0-9]+/[a-z][a-z0-9_-]*/[0-9]+$",
-            "description": "Canonical slash path: DOMAIN/skill_nn/LEVEL/project_slug/obs_index (same five segments as competency-framework GET /api/v1/resolve/{domain}/{skill}/{level}/{project}/{obs_num})."
-          },
-          "description": "Canonical path(s) for this section; `project_slug` must match `project.slug` in this metadata file."
-        },
         "competency": {
           "type": "array",
-          "items": { "$ref": "#/$defs/CompetencyStructured" },
-          "description": "Structured competency reference(s); equivalent to one slash-path when fields match."
+          "items": { "$ref": "#/$defs/CompetencyRef" },
+          "description": "Structured competency / grading hooks for this section (resolve path + optional workshop observable id)."
         },
         "parts": {
           "type": "array",
@@ -151,7 +133,7 @@
         }
       }
     },
-    "CompetencyStructured": {
+    "CompetencyRef": {
       "type": "object",
       "additionalProperties": false,
       "required": ["domain", "skill", "level", "project", "obs_index"],
@@ -159,7 +141,7 @@
         "domain": {
           "type": "string",
           "pattern": "^[A-Z]+$",
-          "description": "Competency domain (e.g. PROG)."
+          "description": "Competency domain (e.g. PROG, TRANS)."
         },
         "skill": {
           "type": "string",
@@ -174,12 +156,17 @@
         "project": {
           "type": "string",
           "pattern": "^[a-z][a-z0-9_-]*$",
-          "description": "Project slug; must match `project.slug` in this file."
+          "description": "Workshop project slug; must match `project.slug` in this file."
         },
         "obs_index": {
           "type": "integer",
           "minimum": 1,
-          "description": "1-based observable index within that domain/skill/level/project bucket (API resolve path segment)."
+          "description": "For framework domains (e.g. PROG): 1-based index in GET /api/v1/resolve/.../{obs_num}. For workshop-only domains (e.g. TRANS) without API mapping, use the workshop ordinal from your grading model."
+        },
+        "observable_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_-]*\\.\\d+$",
+          "description": "When `observables` is declared, each hook must list its id (typically `{project.slug}.N`). Required in that case (enforced by check_toc.py)."
         }
       }
     },

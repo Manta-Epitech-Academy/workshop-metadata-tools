@@ -4,8 +4,8 @@
 - If metadata.yaml is missing, writes a schema-shaped default (including `documents`
   and generated `toc`).
 - If it exists, rebuilds `toc` for every path in `documents` (or `project.entrypoint`
-  when `documents` is absent), preserving existing `cf_code`, `competency_path`, and
-  `competency` values where the title path still matches.
+  when `documents` is absent), preserving existing `competency` values where the title
+  path still matches.
 """
 
 from __future__ import annotations
@@ -119,7 +119,7 @@ def document_paths_from_metadata(data: dict[str, Any]) -> list[str]:
 def collect_preserved_toc_fields(
     sections: list[Any], prefix: tuple[str, ...] = ()
 ) -> dict[tuple[str, ...], dict[str, Any]]:
-    """Map title path -> preserved keys (cf_code, competency_path, competency)."""
+    """Map title path -> preserved keys (competency)."""
     out: dict[tuple[str, ...], dict[str, Any]] = {}
     for node in sections:
         if not isinstance(node, dict):
@@ -129,10 +129,6 @@ def collect_preserved_toc_fields(
             continue
         path = prefix + (title,)
         bag: dict[str, Any] = {}
-        if isinstance(node.get("cf_code"), list):
-            bag["cf_code"] = list(node["cf_code"])
-        if isinstance(node.get("competency_path"), list):
-            bag["competency_path"] = list(node["competency_path"])
         if isinstance(node.get("competency"), list) and node["competency"]:
             bag["competency"] = [
                 dict(x) for x in node["competency"] if isinstance(x, dict)
@@ -156,18 +152,8 @@ def apply_preserved_toc_fields(
             continue
         path = prefix + (title,)
         bag = bag_map.get(path)
-        if bag:
-            if "cf_code" in bag:
-                node["cf_code"] = bag["cf_code"]
-            elif "cf_code" not in node:
-                node["cf_code"] = []
-            if "competency_path" in bag:
-                node["competency_path"] = bag["competency_path"]
-            if "competency" in bag:
-                node["competency"] = bag["competency"]
-        else:
-            if "cf_code" not in node:
-                node["cf_code"] = []
+        if bag and "competency" in bag:
+            node["competency"] = bag["competency"]
         parts = node.get("parts")
         if isinstance(parts, list) and parts:
             apply_preserved_toc_fields(parts, bag_map, path)
