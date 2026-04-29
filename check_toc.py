@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 """Check that `toc` in metadata.yaml matches headings in each listed markdown file.
 
-Also validates:
-- Every cf_code entry matches the pattern DOMAIN-SKILL.LEVEL.OBS_NUM.
-- Every OBS_NUM referenced in cf_code corresponds to a declared observable.
+Also validates `competency` hooks on TOC nodes: slash paths `/DOMAIN/SKILL/LEVEL/PROJECT/OBSINDEX`
+(see schema) or legacy structured objects; when `observables` is non-empty, path OBSINDEX must
+match an observable id `{project.slug}.OBSINDEX`.
+
+TOC shape is **sections (H1) → parts (H2) → subparts (H3)**. Expected titles are derived from
+markdown with the same rules as `toc_lib.markdown_to_toc_sections` (H4+ ignored; orphan H2/H3
+ignored).
 """
 
 from __future__ import annotations
@@ -20,65 +24,225 @@ except ImportError:
     print("check_toc requires PyYAML: pip install pyyaml", file=sys.stderr)
     sys.exit(1)
 
-from toc_lib import markdown_to_toc_nodes, toc_entries_from_metadata
+from toc_lib import markdown_to_toc_sections, toc_entries_from_metadata
 
-CF_CODE_RE = re.compile(r"^[A-Z]+-\d+\.[A-Z]\d+\.(\d+)$")
+_COMP_PATH = re.compile(
+    r"^/([A-Z]+)/([0-9]+)/([A-Z][0-9]+)/([a-z][a-z0-9_-]*)/([1-9][0-9]*)$"
+)
 
 
-def collect_cf_codes(nodes: list[Any], out: list[tuple[str, str]]) -> None:
-    """Recursively collect (cf_code, location_title) pairs from a toc node tree."""
-    for node in nodes:
-        if not isinstance(node, dict):
+def collect_competency(
+    sections: list[Any], out: list[tuple[str | dict[str, Any], str]]
+) -> None:
+    """Collect (competency item, location_title) from section → part → subpart tree."""
+    for sec in sections:
+        if not isinstance(sec, dict):
             continue
-        title = node.get("title", "?")
-        for code in node.get("cf_code") or []:
-            out.append((code, title))
-        collect_cf_codes(node.get("parts") or [], out)
+        stitle = sec.get("title", "?")
+        for item in sec.get("competency") or []:
+            if isinstance(item, (str, dict)):
+                out.append((item, stitle))
+        for part in sec.get("parts") or []:
+            if not isinstance(part, dict):
+                continue
+            ptitle = part.get("title", "?")
+            for item in part.get("competency") or []:
+                if isinstance(item, (str, dict)):
+                    out.append((item, ptitle))
+            for sub in part.get("subparts") or []:
+                if not isinstance(sub, dict):
+                    continue
+                utitle = sub.get("title", "?")
+                for item in sub.get("competency") or []:
+                    if isinstance(item, (str, dict)):
+                        out.append((item, utitle))
 
 
-def check_cf_codes(
-    entries: list[tuple[str, list[Any]]],
-    observable_ids: set[str],
+def _obs_index_ok(raw: Any) -> tuple[bool, str]:
+    if isinstance(raw, bool) or not isinstance(raw, (int, str)):
+        return False, f"obs_index must be an integer, got {type(raw).__name__}"
+    if isinstance(raw, str):
+        if not raw.isdigit() or int(raw) < 1:
+            return False, "obs_index must be a positive integer"
+        return True, ""
+    if isinstance(raw, int) and raw >= 1:
+        return True, ""
+    return False, "obs_index must be a positive integer"
+
+
+def _check_one_competency_dict(
+    ref: dict[str, Any],
+    location: str,
     project_slug: str,
+    observable_ids: set[str],
+    require_obs: bool,
 ) -> list[str]:
-    """Return a list of error messages (empty = all good)."""
     errors: list[str] = []
-    all_codes: list[tuple[str, str]] = []
-    for _doc, sections in entries:
-        collect_cf_codes(sections, all_codes)
+    req = ("domain", "skill", "level", "project", "obs_index")
+    missing = [k for k in req if k not in ref]
+    if missing:
+        errors.append(
+            f"competency entry {ref!r} (in section {location!r}) missing keys: {', '.join(missing)}"
+        )
+        return errors
+    dom, sk, lv, proj, oix = (
+        ref["domain"],
+        ref["skill"],
+        ref["level"],
+        ref["project"],
+        ref["obs_index"],
+    )
+    if not isinstance(dom, str) or not re.fullmatch(r"[A-Z]+", dom):
+        errors.append(
+            f"competency.domain (in section {location!r}) must be uppercase letters, got {dom!r}"
+        )
+    if not isinstance(sk, str) or not re.fullmatch(r"[0-9]+", sk):
+        errors.append(
+            f"competency.skill (in section {location!r}) must be digits, got {sk!r}"
+        )
+    if not isinstance(lv, str) or not re.fullmatch(r"[A-Z][0-9]+", lv):
+        errors.append(
+            f"competency.level (in section {location!r}) must match e.g. A1, got {lv!r}"
+        )
+    if not isinstance(proj, str) or not re.fullmatch(r"[a-z][a-z0-9_-]*", proj):
+        errors.append(
+            f"competency.project (in section {location!r}) must be a slug, got {proj!r}"
+        )
+    ok, msg = _obs_index_ok(oix)
+    if not ok:
+        errors.append(f"competency.obs_index (in section {location!r}): {msg}")
+    if isinstance(proj, str) and proj != project_slug:
+        errors.append(
+            f"competency.project {proj!r} (in section {location!r}) must match"
+            f" metadata project.slug {project_slug!r}"
+        )
 
-    for code, location in all_codes:
-        m = CF_CODE_RE.match(code)
-        if not m:
+    oid = ref.get("observable_id")
+    if require_obs:
+        if not isinstance(oid, str) or not oid.strip():
             errors.append(
-                f"cf_code {code!r} (in section {location!r}) does not match"
-                " DOMAIN-SKILL.LEVEL.OBS_NUM format"
+                f"competency entry (in section {location!r}) must set observable_id"
+                " when observables are declared"
             )
-            continue
-        obs_num = m.group(1)
-        expected_id = f"{project_slug}.{obs_num}"
-        if observable_ids and expected_id not in observable_ids:
+        else:
+            if oid not in observable_ids:
+                errors.append(
+                    f"competency observable_id {oid!r} (in section {location!r}) is not"
+                    " declared under observables"
+                )
+            exp_prefix = f"{project_slug}."
+            if not oid.startswith(exp_prefix):
+                errors.append(
+                    f"competency observable_id {oid!r} (in section {location!r}) must start"
+                    f" with {exp_prefix!r}"
+                )
+    elif observable_ids and isinstance(oid, str) and oid.strip() and oid not in observable_ids:
+        errors.append(
+            f"competency observable_id {oid!r} (in section {location!r}) is not declared"
+            " under observables"
+        )
+    return errors
+
+
+def _check_one_competency_path(
+    path: str,
+    location: str,
+    project_slug: str,
+    observable_ids: set[str],
+    require_obs: bool,
+) -> list[str]:
+    errors: list[str] = []
+    m = _COMP_PATH.fullmatch(path.strip())
+    if not m:
+        errors.append(
+            f"competency path {path!r} (in section {location!r}) must match"
+            " /DOMAIN/SKILL/LEVEL/PROJECT/OBSINDEX (see metadata schema)"
+        )
+        return errors
+    dom, sk, lv, proj, obs_tail = m.group(1), m.group(2), m.group(3), m.group(4), m.group(5)
+    if proj != project_slug:
+        errors.append(
+            f"competency path project segment {proj!r} (in section {location!r}) must match"
+            f" metadata project.slug {project_slug!r}"
+        )
+    if require_obs:
+        oid = f"{project_slug}.{obs_tail}"
+        if oid not in observable_ids:
             errors.append(
-                f"cf_code {code!r} (in section {location!r}) references observable"
-                f" {expected_id!r} which is not declared in observables"
+                f"competency path {path!r} (in section {location!r}): observable {oid!r} is not"
+                " declared under observables"
             )
     return errors
 
 
-def normalize_toc_node(node: Any) -> dict[str, Any]:
+def check_competency_refs(
+    entries: list[tuple[str, list[Any]]],
+    project_slug: str,
+    observable_ids: set[str],
+) -> list[str]:
+    errors: list[str] = []
+    collected: list[tuple[str | dict[str, Any], str]] = []
+    for _doc, sections in entries:
+        collect_competency(sections, collected)
+
+    require_obs = bool(observable_ids)
+    for ref, location in collected:
+        if isinstance(ref, str):
+            errors.extend(_check_one_competency_path(ref, location, project_slug, observable_ids, require_obs))
+        elif isinstance(ref, dict):
+            errors.extend(
+                _check_one_competency_dict(ref, location, project_slug, observable_ids, require_obs)
+            )
+        else:
+            errors.append(
+                f"competency entry {ref!r} (in section {location!r}) must be a string path or mapping"
+            )
+
+    return errors
+
+
+def normalize_subpart(node: Any) -> dict[str, Any]:
     if not isinstance(node, dict):
-        raise ValueError(f"toc entry must be a mapping, got {type(node).__name__}")
+        raise ValueError(f"toc subpart must be a mapping, got {type(node).__name__}")
     if "title" not in node:
-        raise ValueError("toc entry missing 'title'")
+        raise ValueError("toc subpart missing 'title'")
     title = node["title"]
     if not isinstance(title, str):
-        raise ValueError("'title' must be a string")
+        raise ValueError("subpart 'title' must be a string")
+    return {"title": title}
+
+
+def normalize_part(node: Any) -> dict[str, Any]:
+    if not isinstance(node, dict):
+        raise ValueError(f"toc part must be a mapping, got {type(node).__name__}")
+    if "title" not in node:
+        raise ValueError("toc part missing 'title'")
+    title = node["title"]
+    if not isinstance(title, str):
+        raise ValueError("part 'title' must be a string")
+    subs_raw = node.get("subparts", [])
+    if subs_raw is None:
+        subs_raw = []
+    if not isinstance(subs_raw, list):
+        raise ValueError("'subparts' must be a list")
+    subparts = [normalize_subpart(s) for s in subs_raw]
+    return {"title": title, "subparts": subparts}
+
+
+def normalize_section(node: Any) -> dict[str, Any]:
+    if not isinstance(node, dict):
+        raise ValueError(f"toc section must be a mapping, got {type(node).__name__}")
+    if "title" not in node:
+        raise ValueError("toc section missing 'title'")
+    title = node["title"]
+    if not isinstance(title, str):
+        raise ValueError("section 'title' must be a string")
     parts_raw = node.get("parts", [])
     if parts_raw is None:
         parts_raw = []
     if not isinstance(parts_raw, list):
         raise ValueError("'parts' must be a list")
-    parts = [normalize_toc_node(p) for p in parts_raw]
+    parts = [normalize_part(p) for p in parts_raw]
     return {"title": title, "parts": parts}
 
 
@@ -101,9 +265,32 @@ def trees_equal(
             )
         lp = left.get("parts", [])
         rp = right.get("parts", [])
-        ok, msg = trees_equal(lp, rp, f"{sub}.parts")
-        if not ok:
-            return False, msg
+        if len(lp) != len(rp):
+            return (
+                False,
+                f"{sub}.parts: expected {len(lp)} part(s), found {len(rp)}",
+            )
+        for j, (pl, pr) in enumerate(zip(lp, rp)):
+            psub = f"{sub}.parts[{j}]"
+            if pl["title"] != pr["title"]:
+                return (
+                    False,
+                    f"{psub}: title mismatch — markdown: {pl['title']!r}, yaml: {pr['title']!r}",
+                )
+            ls = pl.get("subparts", [])
+            rs = pr.get("subparts", [])
+            if len(ls) != len(rs):
+                return (
+                    False,
+                    f"{psub}.subparts: expected {len(ls)} subpart(s), found {len(rs)}",
+                )
+            for k, (sl, sr) in enumerate(zip(ls, rs)):
+                ssub = f"{psub}.subparts[{k}]"
+                if sl["title"] != sr["title"]:
+                    return (
+                        False,
+                        f"{ssub}: title mismatch — markdown: {sl['title']!r}, yaml: {sr['title']!r}",
+                    )
     return True, ""
 
 
@@ -142,10 +329,10 @@ def main() -> None:
         obs["id"] for obs in observables_raw if isinstance(obs, dict) and "id" in obs
     }
 
-    cf_errors = check_cf_codes(entries, observable_ids, project_slug)
-    for err in cf_errors:
+    errs = check_competency_refs(entries, project_slug, observable_ids)
+    for err in errs:
         print(f"FAIL: {err}", file=sys.stderr)
-    if cf_errors:
+    if errs:
         sys.exit(1)
 
     for doc_rel, yaml_sections in entries:
@@ -155,17 +342,20 @@ def main() -> None:
             sys.exit(1)
 
         md_text = md_path.read_text(encoding="utf-8")
-        expected = markdown_to_toc_nodes(md_text)
-        for n in expected:
-            n["parts"] = n.get("parts", [])
+        expected = markdown_to_toc_sections(md_text)
+        for s in expected:
+            s.setdefault("parts", [])
+            for p in s.get("parts", []):
+                p.setdefault("subparts", [])
 
         try:
-            got = [normalize_toc_node(x) for x in yaml_sections]
+            got = [normalize_section(x) for x in yaml_sections]
         except ValueError as e:
             print(f"check_toc: invalid toc for {doc_rel}: {e}", file=sys.stderr)
             sys.exit(2)
 
-        ok, msg = trees_equal(expected, got)
+        exp_norm = [normalize_section(x) for x in expected]
+        ok, msg = trees_equal(exp_norm, got)
         if not ok:
             print(f"FAIL ({doc_rel}): {msg}", file=sys.stderr)
             sys.exit(1)

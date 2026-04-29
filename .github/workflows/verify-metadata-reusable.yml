@@ -14,7 +14,7 @@ jobs:
       - name: Check out workshop-metadata-tools
         uses: actions/checkout@v4
         with:
-          repository: Manta-Epitech-Academy/workshop-metadata-tools
+          repository: kevin-cazal/workshop-metadata-tools
           path: workshop-metadata-tools
           ref: main
 
@@ -46,7 +46,7 @@ jobs:
             exit 1
           fi
 
-      - name: Verify toc vs markdown and cf_code rules
+      - name: Verify toc vs markdown and competency rules
         env:
           PYTHONPATH: ${{ github.workspace }}/workshop-metadata-tools
         run: python "${GITHUB_WORKSPACE}/workshop-metadata-tools/check_toc.py"

@@ -34,19 +34,31 @@ def md_file_link(path: str) -> str:
     return f"[{p}]({p})"
 
 
-def render_section_tree(nodes: list[Any], depth: int = 0) -> list[str]:
+def render_section_tree(sections: list[Any], depth: int = 0) -> list[str]:
+    """Render sections → parts → subparts (H1 / H2 / H3)."""
     lines: list[str] = []
-    for node in nodes:
-        if not isinstance(node, dict):
+    for sec in sections:
+        if not isinstance(sec, dict):
             continue
-        title = node.get("title")
+        title = sec.get("title")
         if not isinstance(title, str) or not title.strip():
             continue
         indent = "  " * depth
         lines.append(f"{indent}- {title.strip()}")
-        parts = node.get("parts")
-        if isinstance(parts, list) and parts:
-            lines.extend(render_section_tree(parts, depth + 1))
+        for part in sec.get("parts") or []:
+            if not isinstance(part, dict):
+                continue
+            pt = part.get("title")
+            if not isinstance(pt, str) or not pt.strip():
+                continue
+            lines.append(f"{indent}  - {pt.strip()}")
+            for sub in part.get("subparts") or []:
+                if not isinstance(sub, dict):
+                    continue
+                st = sub.get("title")
+                if not isinstance(st, str) or not st.strip():
+                    continue
+                lines.append(f"{indent}    - {st.strip()}")
     return lines
 
 
@@ -121,7 +133,11 @@ def build_readme(data: dict[str, Any]) -> str:
     toc = data.get("toc")
     if isinstance(toc, list) and toc:
         parts.append("\n## Table of contents\n\n")
-        if is_multi_document_toc(toc):
+        if not is_multi_document_toc(toc):
+            parts.append(
+                "_TOC must be a list of `{ document, sections }` entries (schema 1.5+)._\n\n"
+            )
+        else:
             for item in toc:
                 if not isinstance(item, dict):
                     continue
@@ -133,10 +149,6 @@ def build_readme(data: dict[str, Any]) -> str:
                 for line in render_section_tree(sections):
                     parts.append(line + "\n")
                 parts.append("\n")
-        else:
-            for line in render_section_tree(toc):
-                parts.append(line + "\n")
-            parts.append("\n")
 
     observables = data.get("observables")
     if isinstance(observables, list) and observables:
@@ -151,7 +163,7 @@ def build_readme(data: dict[str, Any]) -> str:
     parts.append(
         "\n---\n\n"
         "Validation tooling: "
-        "[workshop-metadata-tools](https://github.com/Manta-Epitech-Academy/workshop-metadata-tools).\n"
+        "[workshop-metadata-tools](https://github.com/kevin-cazal/workshop-metadata-tools).\n"
     )
 
     return "".join(parts)

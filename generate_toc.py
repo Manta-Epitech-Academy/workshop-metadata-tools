@@ -2,6 +2,7 @@
 """Generate a YAML `toc` from markdown headings (code fences excluded).
 
 Each input file becomes one `{ document, sections }` entry under `toc`.
+Sections use **sections** (H1) → **parts** (H2) → **subparts** (H3); see `docs/TOC_RUNTIME.md`.
 """
 
 from __future__ import annotations
@@ -16,7 +17,7 @@ except ImportError:
     print("generate_toc requires PyYAML: pip install pyyaml", file=sys.stderr)
     sys.exit(1)
 
-from toc_lib import markdown_to_toc_nodes
+from toc_lib import markdown_to_toc_sections
 
 
 def main() -> None:
@@ -46,7 +47,7 @@ def main() -> None:
     toc_entries: list[dict] = []
     for path in args.markdown:
         text = path.read_text(encoding="utf-8")
-        nodes = markdown_to_toc_nodes(text)
+        nodes = markdown_to_toc_sections(text)
         resolved = path.resolve()
         try:
             doc_id = resolved.relative_to(cwd).as_posix()

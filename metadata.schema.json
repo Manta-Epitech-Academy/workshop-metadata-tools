@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/Manta-Epitech-Academy/workshop-metadata-tools/main/metadata.schema.json",
+  "$id": "https://raw.githubusercontent.com/kevin-cazal/workshop-metadata-tools/main/metadata.schema.json",
   "title": "Workshop metadata",
   "type": "object",
   "additionalProperties": false,
@@ -9,7 +9,7 @@
     "schema_version": {
       "type": "string",
       "pattern": "^\\d+\\.\\d+\\.\\d+$|^\\d+\\.\\d+$",
-      "description": "Semantic version of this metadata document shape."
+      "description": "Semantic version of this metadata document shape. Use 1.5+ for section/part/subpart toc."
     },
     "project": {
       "type": "object",
@@ -45,20 +45,10 @@
       "items": { "$ref": "#/$defs/Document" }
     },
     "toc": {
-      "oneOf": [
-        {
-          "type": "array",
-          "minItems": 1,
-          "items": { "$ref": "#/$defs/TocDocument" },
-          "description": "One or more markdown files, each with its own section tree."
-        },
-        {
-          "type": "array",
-          "minItems": 1,
-          "items": { "$ref": "#/$defs/TocNode" },
-          "description": "Legacy: flat section tree for a single file named by project.entrypoint."
-        }
-      ]
+      "type": "array",
+      "minItems": 1,
+      "description": "One or more markdown files, each with sections (H1), parts (H2), subparts (H3).",
+      "items": { "$ref": "#/$defs/TocDocument" }
     },
     "observables": {
       "type": "array",
@@ -99,6 +89,91 @@
         "email": { "type": "string", "format": "email" }
       }
     },
+    "TocCompetencyItem": {
+      "oneOf": [
+        {
+          "type": "string",
+          "pattern": "^/[A-Z]+/[0-9]+/[A-Z][0-9]+/[a-z][a-z0-9_-]*/[1-9][0-9]*$",
+          "description": "Canonical hook: /DOMAIN/SKILL/LEVEL/PROJECT/OBSINDEX"
+        },
+        { "$ref": "#/$defs/CompetencyRef" }
+      ]
+    },
+    "TocObservableRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["skill_path"],
+      "properties": {
+        "skill_path": {
+          "type": "string",
+          "pattern": "^/[A-Z]+/[0-9]+/[A-Z][0-9]+$",
+          "description": "Framework skill path segment (domain / skill / level), e.g. /PROG/01/A1"
+        },
+        "id": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Optional 1-based observable ordinal; corresponds to top-level `observables[].id` `{project.slug}.{id}` when that list is declared."
+        }
+      }
+    },
+    "TocSubpart": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title"],
+      "properties": {
+        "title": { "type": "string", "minLength": 1 },
+        "competency": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/TocCompetencyItem" }
+        },
+        "observables": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/TocObservableRef" }
+        }
+      }
+    },
+    "TocPart": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title"],
+      "properties": {
+        "title": { "type": "string", "minLength": 1 },
+        "subparts": {
+          "type": "array",
+          "description": "H3 entries under this part.",
+          "items": { "$ref": "#/$defs/TocSubpart" }
+        },
+        "competency": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/TocCompetencyItem" }
+        },
+        "observables": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/TocObservableRef" }
+        }
+      }
+    },
+    "TocSection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title"],
+      "properties": {
+        "title": { "type": "string", "minLength": 1 },
+        "parts": {
+          "type": "array",
+          "description": "H2 entries under this section.",
+          "items": { "$ref": "#/$defs/TocPart" }
+        },
+        "competency": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/TocCompetencyItem" }
+        },
+        "observables": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/TocObservableRef" }
+        }
+      }
+    },
     "TocDocument": {
       "type": "object",
       "additionalProperties": false,
@@ -111,29 +186,45 @@
         },
         "sections": {
           "type": "array",
-          "description": "Heading tree for that file (H1 roots, nested parts).",
-          "items": { "$ref": "#/$defs/TocNode" }
+          "description": "H1 roots for that file; each may have parts (H2) and optional subparts (H3).",
+          "items": { "$ref": "#/$defs/TocSection" }
         }
       }
     },
-    "TocNode": {
+    "CompetencyRef": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["title"],
+      "required": ["domain", "skill", "level", "project", "obs_index"],
       "properties": {
-        "title": { "type": "string", "minLength": 1 },
-        "cf_code": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "pattern": "^[A-Z]+-\\d+\\.[A-Z]\\d+\\.\\d+$",
-            "description": "Format: DOMAIN-SKILL_ID.LEVEL.OBS_NUM (e.g. PROG-01.A1.1)"
-          },
-          "description": "Competency references tied to this section (can be empty)."
+        "domain": {
+          "type": "string",
+          "pattern": "^[A-Z]+$",
+          "description": "Competency domain (e.g. PROG, TRANS)."
         },
-        "parts": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/TocNode" }
+        "skill": {
+          "type": "string",
+          "pattern": "^[0-9]+$",
+          "description": "Skill number as digits (e.g. 01 or 1)."
+        },
+        "level": {
+          "type": "string",
+          "pattern": "^[A-Z][0-9]+$",
+          "description": "Level code such as A1, A2."
+        },
+        "project": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_-]*$",
+          "description": "Workshop project slug; must match `project.slug` in this file."
+        },
+        "obs_index": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "For framework domains (e.g. PROG): 1-based index in GET /api/v1/resolve/.../{obs_num}. For workshop-only domains (e.g. TRANS) without API mapping, use the workshop ordinal from your grading model."
+        },
+        "observable_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_-]*\\.\\d+$",
+          "description": "When `observables` is declared, each hook must list its id (typically `{project.slug}.N`). Required in that case (enforced by check_toc.py)."
         }
       }
     },
