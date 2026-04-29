@@ -115,7 +115,7 @@ flowchart TB
 In the **current (multi-document) model**, `toc` is a **list of objects**, each with:
 
 - **`document`**: path to a `.md` file (same path convention as elsewhere).
-- **`sections`**: a **tree of headings** extracted from that file (`title`, optional `competency`, nested `parts`), mirroring `#` / `##` / `###` … structure in the markdown. See [`competency_path_notation.md`](competency_path_notation.md).
+- **`sections`**: **H1** roots; each section has optional **`parts`** (**H2**); each part has optional **`subparts`** (**H3**). Optional `competency` and inline **`observables`** may appear on a section, part, or subpart. Headings **H4+** are not stored in `toc` (see [`TOC_RUNTIME.md`](TOC_RUNTIME.md)). See [`competency_path_notation.md`](competency_path_notation.md).
 
 ```mermaid
 flowchart TB
@@ -125,16 +125,14 @@ flowchart TB
   end
   subgraph e1["entry 1"]
     D1["document: WORKSHOP.md"]
-    S1["sections: H1 → H2 → H3 tree"]
+    S1["sections: H1 → parts H2 → subparts H3"]
   end
   E1 --> e1
 ```
 
-So: **`len(toc)`** in this mode equals the **number of markdown files** you expose in the combined outline (not counting legacy single-file mode).
+So: **`len(toc)`** equals the **number of markdown files** you expose in the combined outline.
 
-### Legacy `toc` (single file)
-
-For older data, `toc` may be a **flat list of sections** (no `document` / `sections` wrapper). In that case the **single** markdown file is **`project.entrypoint`**, and the whole list is the section tree for that file.
+**Schema 1.5+:** `toc` must always be the multi-document list above; the former flat “legacy” `toc` shape (single file without `document` / `sections` wrappers) is **removed**.
 
 ---
 
@@ -207,6 +205,6 @@ Shared Python tooling and schema: [**workshop-metadata-tools**](https://github.c
 | **Repo ↔ metadata** | One repository, one `metadata.yaml` as the structural entry point. |
 | **Entrypoint** | Exactly one `project.entrypoint` marking the primary `.md` file. |
 | **Documents** | Zero or more declared `.md` paths, optionally with `depends_on` prerequisites. |
-| **TOC** | Required; in multi-document mode, **`toc` has one item per outlined `.md`**, each with `document` + `sections` matching headings in that file. |
+| **TOC** | Required; **`toc` has one item per outlined `.md`**, each with `document` + `sections` (H1→H2→H3) matching headings in that file per [`TOC_RUNTIME.md`](TOC_RUNTIME.md). |
 
-For field-level constraints (types, patterns, `oneOf` for legacy `toc`), see **`metadata.schema.json`** in the [**workshop-metadata-tools**](https://github.com/kevin-cazal/workshop-metadata-tools) repository (or the `$schema` URL in your `metadata.yaml`).
+For field-level constraints (types, patterns), see **`metadata.schema.json`** in the [**workshop-metadata-tools**](https://github.com/kevin-cazal/workshop-metadata-tools) repository (or the `$schema` URL in your `metadata.yaml`).

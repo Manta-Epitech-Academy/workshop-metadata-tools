@@ -39,9 +39,12 @@ You may add a copy of `metadata.schema.json` at the workshop root to override th
 Canonical file: [`metadata.schema.json`](metadata.schema.json) (published at  
 `https://raw.githubusercontent.com/kevin-cazal/workshop-metadata-tools/main/metadata.schema.json`).
 
+**Schema 1.5** introduces a fixed-depth `toc`: each document has **`sections`** (H1) → **`parts`** (H2) → **`subparts`** (H3). Legacy flat `toc` (single file without `document` / `sections`) is no longer accepted. Workshop repos should set `schema_version: "1.5"` when adopting this shape.
+
 ## Documentation
 
 - [`docs/STRUCTURE.md`](docs/STRUCTURE.md) — metadata model, diagrams (Mermaid), and layout.
+- [`docs/TOC_RUNTIME.md`](docs/TOC_RUNTIME.md) — how headings map to `toc` (H4+ and orphan rules).
 - [`docs/QUIZ.md`](docs/QUIZ.md) — quiz blocks in Markdown (not in `metadata.yaml` / `toc`).
 - [`docs/structure-diagrams.html`](docs/structure-diagrams.html) — same diagrams as STRUCTURE in a browser (open locally).
 

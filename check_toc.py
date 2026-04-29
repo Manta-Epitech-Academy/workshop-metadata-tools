@@ -4,6 +4,10 @@
 Also validates `competency` hooks on TOC nodes: slash paths `/DOMAIN/SKILL/LEVEL/PROJECT/OBSINDEX`
 (see schema) or legacy structured objects; when `observables` is non-empty, path OBSINDEX must
 match an observable id `{project.slug}.OBSINDEX`.
+
+TOC shape is **sections (H1) → parts (H2) → subparts (H3)**. Expected titles are derived from
+markdown with the same rules as `toc_lib.markdown_to_toc_sections` (H4+ ignored; orphan H2/H3
+ignored).
 """
 
 from __future__ import annotations
@@ -20,7 +24,7 @@ except ImportError:
     print("check_toc requires PyYAML: pip install pyyaml", file=sys.stderr)
     sys.exit(1)
 
-from toc_lib import markdown_to_toc_nodes, toc_entries_from_metadata
+from toc_lib import markdown_to_toc_sections, toc_entries_from_metadata
 
 _COMP_PATH = re.compile(
     r"^/([A-Z]+)/([0-9]+)/([A-Z][0-9]+)/([a-z][a-z0-9_-]*)/([1-9][0-9]*)$"
@@ -28,16 +32,30 @@ _COMP_PATH = re.compile(
 
 
 def collect_competency(
-    nodes: list[Any], out: list[tuple[str | dict[str, Any], str]]
+    sections: list[Any], out: list[tuple[str | dict[str, Any], str]]
 ) -> None:
-    for node in nodes:
-        if not isinstance(node, dict):
+    """Collect (competency item, location_title) from section → part → subpart tree."""
+    for sec in sections:
+        if not isinstance(sec, dict):
             continue
-        title = node.get("title", "?")
-        for item in node.get("competency") or []:
+        stitle = sec.get("title", "?")
+        for item in sec.get("competency") or []:
             if isinstance(item, (str, dict)):
-                out.append((item, title))
-        collect_competency(node.get("parts") or [], out)
+                out.append((item, stitle))
+        for part in sec.get("parts") or []:
+            if not isinstance(part, dict):
+                continue
+            ptitle = part.get("title", "?")
+            for item in part.get("competency") or []:
+                if isinstance(item, (str, dict)):
+                    out.append((item, ptitle))
+            for sub in part.get("subparts") or []:
+                if not isinstance(sub, dict):
+                    continue
+                utitle = sub.get("title", "?")
+                for item in sub.get("competency") or []:
+                    if isinstance(item, (str, dict)):
+                        out.append((item, utitle))
 
 
 def _obs_index_ok(raw: Any) -> tuple[bool, str]:
@@ -183,20 +201,48 @@ def check_competency_refs(
     return errors
 
 
-def normalize_toc_node(node: Any) -> dict[str, Any]:
+def normalize_subpart(node: Any) -> dict[str, Any]:
     if not isinstance(node, dict):
-        raise ValueError(f"toc entry must be a mapping, got {type(node).__name__}")
+        raise ValueError(f"toc subpart must be a mapping, got {type(node).__name__}")
     if "title" not in node:
-        raise ValueError("toc entry missing 'title'")
+        raise ValueError("toc subpart missing 'title'")
     title = node["title"]
     if not isinstance(title, str):
-        raise ValueError("'title' must be a string")
+        raise ValueError("subpart 'title' must be a string")
+    return {"title": title}
+
+
+def normalize_part(node: Any) -> dict[str, Any]:
+    if not isinstance(node, dict):
+        raise ValueError(f"toc part must be a mapping, got {type(node).__name__}")
+    if "title" not in node:
+        raise ValueError("toc part missing 'title'")
+    title = node["title"]
+    if not isinstance(title, str):
+        raise ValueError("part 'title' must be a string")
+    subs_raw = node.get("subparts", [])
+    if subs_raw is None:
+        subs_raw = []
+    if not isinstance(subs_raw, list):
+        raise ValueError("'subparts' must be a list")
+    subparts = [normalize_subpart(s) for s in subs_raw]
+    return {"title": title, "subparts": subparts}
+
+
+def normalize_section(node: Any) -> dict[str, Any]:
+    if not isinstance(node, dict):
+        raise ValueError(f"toc section must be a mapping, got {type(node).__name__}")
+    if "title" not in node:
+        raise ValueError("toc section missing 'title'")
+    title = node["title"]
+    if not isinstance(title, str):
+        raise ValueError("section 'title' must be a string")
     parts_raw = node.get("parts", [])
     if parts_raw is None:
         parts_raw = []
     if not isinstance(parts_raw, list):
         raise ValueError("'parts' must be a list")
-    parts = [normalize_toc_node(p) for p in parts_raw]
+    parts = [normalize_part(p) for p in parts_raw]
     return {"title": title, "parts": parts}
 
 
@@ -219,9 +265,32 @@ def trees_equal(
             )
         lp = left.get("parts", [])
         rp = right.get("parts", [])
-        ok, msg = trees_equal(lp, rp, f"{sub}.parts")
-        if not ok:
-            return False, msg
+        if len(lp) != len(rp):
+            return (
+                False,
+                f"{sub}.parts: expected {len(lp)} part(s), found {len(rp)}",
+            )
+        for j, (pl, pr) in enumerate(zip(lp, rp)):
+            psub = f"{sub}.parts[{j}]"
+            if pl["title"] != pr["title"]:
+                return (
+                    False,
+                    f"{psub}: title mismatch — markdown: {pl['title']!r}, yaml: {pr['title']!r}",
+                )
+            ls = pl.get("subparts", [])
+            rs = pr.get("subparts", [])
+            if len(ls) != len(rs):
+                return (
+                    False,
+                    f"{psub}.subparts: expected {len(ls)} subpart(s), found {len(rs)}",
+                )
+            for k, (sl, sr) in enumerate(zip(ls, rs)):
+                ssub = f"{psub}.subparts[{k}]"
+                if sl["title"] != sr["title"]:
+                    return (
+                        False,
+                        f"{ssub}: title mismatch — markdown: {sl['title']!r}, yaml: {sr['title']!r}",
+                    )
     return True, ""
 
 
@@ -273,17 +342,20 @@ def main() -> None:
             sys.exit(1)
 
         md_text = md_path.read_text(encoding="utf-8")
-        expected = markdown_to_toc_nodes(md_text)
-        for n in expected:
-            n["parts"] = n.get("parts", [])
+        expected = markdown_to_toc_sections(md_text)
+        for s in expected:
+            s.setdefault("parts", [])
+            for p in s.get("parts", []):
+                p.setdefault("subparts", [])
 
         try:
-            got = [normalize_toc_node(x) for x in yaml_sections]
+            got = [normalize_section(x) for x in yaml_sections]
         except ValueError as e:
             print(f"check_toc: invalid toc for {doc_rel}: {e}", file=sys.stderr)
             sys.exit(2)
 
-        ok, msg = trees_equal(expected, got)
+        exp_norm = [normalize_section(x) for x in expected]
+        ok, msg = trees_equal(exp_norm, got)
         if not ok:
             print(f"FAIL ({doc_rel}): {msg}", file=sys.stderr)
             sys.exit(1)

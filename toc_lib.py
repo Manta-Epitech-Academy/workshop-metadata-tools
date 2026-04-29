@@ -40,44 +40,51 @@ def extract_heading_lines(text: str) -> list[tuple[int, str]]:
     return result
 
 
-def headings_to_toc_nodes(headings: list[tuple[int, str]]) -> list[dict[str, Any]]:
+def headings_to_toc_sections(headings: list[tuple[int, str]]) -> list[dict[str, Any]]:
     """
-    Build nested TOC nodes: {title, parts?: [...]} from ordered (level, title).
-    Same rules as HTML outline: deeper heading nests under the nearest higher-level open section.
+    Build sections (H1) → parts (H2) → subparts (H3).
+
+    - Headings deeper than H3 are ignored when building this tree (they may still
+      exist in the markdown for prose structure).
+    - An H2 before any H1 is ignored (orphan part).
+    - An H3 before any H2 under the current H1 is ignored (orphan subpart).
     """
-    roots: list[dict[str, Any]] = []
-    stack: list[tuple[int, dict[str, Any]]] = []
+    sections: list[dict[str, Any]] = []
+    cur_section: dict[str, Any] | None = None
+    cur_part: dict[str, Any] | None = None
 
     for level, title in headings:
-        node: dict[str, Any] = {"title": title}
+        if level == 1:
+            cur_section = {"title": title}
+            sections.append(cur_section)
+            cur_part = None
+        elif level == 2:
+            if cur_section is None:
+                continue
+            cur_part = {"title": title}
+            if "parts" not in cur_section:
+                cur_section["parts"] = []
+            cur_section["parts"].append(cur_part)
+        elif level == 3:
+            if cur_part is None:
+                continue
+            sub = {"title": title}
+            if "subparts" not in cur_part:
+                cur_part["subparts"] = []
+            cur_part["subparts"].append(sub)
+        # level >= 4: ignored for toc generation
 
-        while stack and stack[-1][0] >= level:
-            stack.pop()
-
-        if not stack:
-            roots.append(node)
-            stack.append((level, node))
-            continue
-
-        parent_level, parent = stack[-1]
-        if level <= parent_level:
-            raise RuntimeError("invalid heading stack state")
-        if "parts" not in parent:
-            parent["parts"] = []
-        parent["parts"].append(node)
-        stack.append((level, node))
-
-    return roots
+    return sections
 
 
-def markdown_to_toc_nodes(text: str) -> list[dict[str, Any]]:
-    """Heading tree for a single markdown document."""
+def markdown_to_toc_sections(text: str) -> list[dict[str, Any]]:
+    """Heading tree for a single markdown document (H1 / H2 / H3 only)."""
     headings = extract_heading_lines(text)
-    return headings_to_toc_nodes(headings)
+    return headings_to_toc_sections(headings)
 
 
 def is_multi_document_toc(toc: list[Any] | None) -> bool:
-    """True if `toc` uses `{ document, sections }` entries (not a flat legacy list)."""
+    """True if `toc` uses `{ document, sections }` entries."""
     if not toc or not isinstance(toc, list):
         return False
     first = toc[0]
@@ -91,33 +98,28 @@ def is_multi_document_toc(toc: list[Any] | None) -> bool:
 def toc_entries_from_metadata(metadata: dict[str, Any]) -> list[tuple[str, list[dict[str, Any]]]]:
     """
     Return (document_path, section_tree) for each TOC entry.
-    Supports multi-document `toc` or legacy flat list under `project.entrypoint`.
+
+    Only the multi-document shape is supported: each item must have `document` and `sections`.
     """
     toc = metadata.get("toc")
     if not isinstance(toc, list) or not toc:
         raise ValueError("metadata has no toc list")
 
-    if is_multi_document_toc(toc):
-        out: list[tuple[str, list[dict[str, Any]]]] = []
-        for item in toc:
-            if not isinstance(item, dict):
-                raise ValueError("toc entry must be a mapping")
-            doc = item.get("document")
-            sections = item.get("sections")
-            if not isinstance(doc, str) or not doc.strip():
-                raise ValueError('each toc entry must have a non-empty "document" string')
-            if not isinstance(sections, list):
-                raise ValueError('each toc entry must have a "sections" list')
-            out.append((doc.strip(), sections))
-        return out
-
-    entrypoint = (
-        (metadata.get("project") or {}).get("entrypoint")
-        if isinstance(metadata.get("project"), dict)
-        else None
-    )
-    if not entrypoint or not isinstance(entrypoint, str):
+    if not is_multi_document_toc(toc):
         raise ValueError(
-            "legacy flat toc requires project.entrypoint to name the markdown file"
+            'metadata.toc must be a list of { "document", "sections" } objects '
+            "(legacy flat toc under project.entrypoint is no longer supported)"
         )
-    return [(entrypoint.strip(), toc)]
+
+    out: list[tuple[str, list[dict[str, Any]]]] = []
+    for item in toc:
+        if not isinstance(item, dict):
+            raise ValueError("toc entry must be a mapping")
+        doc = item.get("document")
+        sections = item.get("sections")
+        if not isinstance(doc, str) or not doc.strip():
+            raise ValueError('each toc entry must have a non-empty "document" string')
+        if not isinstance(sections, list):
+            raise ValueError('each toc entry must have a "sections" list')
+        out.append((doc.strip(), sections))
+    return out
