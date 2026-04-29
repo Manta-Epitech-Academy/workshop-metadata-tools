@@ -115,7 +115,7 @@ flowchart TB
 In the **current (multi-document) model**, `toc` is a **list of objects**, each with:
 
 - **`document`**: path to a `.md` file (same path convention as elsewhere).
-- **`sections`**: **H1** roots; each section has optional **`parts`** (**H2**); each part has optional **`subparts`** (**H3**). Optional `competency` and inline **`observables`** may appear on a section, part, or subpart. Headings **H4+** are not stored in `toc` (see [`TOC_RUNTIME.md`](TOC_RUNTIME.md)). See [`competency_path_notation.md`](competency_path_notation.md).
+- **`sections`**: **H1** roots; each section has optional **`parts`** (**H2**); each part has optional **`subparts`** (**H3**). Optional `competency` and inline **`observables`** (`skill_path` + optional integer **`id`**) may appear on a section, part, or subpart. Headings **H4+** are not stored in `toc` (see [`TOC_RUNTIME.md`](TOC_RUNTIME.md)). See [`competency_path_notation.md`](competency_path_notation.md).
 
 ```mermaid
 flowchart TB
