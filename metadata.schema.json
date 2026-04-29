@@ -110,14 +110,9 @@
           "description": "Framework skill path segment (domain / skill / level), e.g. /PROG/01/A1"
         },
         "id": {
-          "description": "Observable ordinal (integer) or full id `{slug}.{n}`.",
-          "oneOf": [
-            { "type": "integer", "minimum": 1 },
-            {
-              "type": "string",
-              "pattern": "^[a-z][a-z0-9_-]*\\.\\d+$"
-            }
-          ]
+          "type": "integer",
+          "minimum": 1,
+          "description": "Optional 1-based observable ordinal; corresponds to top-level `observables[].id` `{project.slug}.{id}` when that list is declared."
         }
       }
     },

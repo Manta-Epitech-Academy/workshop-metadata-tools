@@ -39,7 +39,7 @@ You may add a copy of `metadata.schema.json` at the workshop root to override th
 Canonical file: [`metadata.schema.json`](metadata.schema.json) (published at  
 `https://raw.githubusercontent.com/kevin-cazal/workshop-metadata-tools/main/metadata.schema.json`).
 
-**Schema 1.5** introduces a fixed-depth `toc`: each document has **`sections`** (H1) → **`parts`** (H2) → **`subparts`** (H3). Legacy flat `toc` (single file without `document` / `sections`) is no longer accepted. Workshop repos should set `schema_version: "1.5"` when adopting this shape.
+**Schema 1.5** introduces a fixed-depth `toc`: each document has **`sections`** (H1) → **`parts`** (H2) → **`subparts`** (H3). Legacy flat `toc` (single file without `document` / `sections`) is no longer accepted. Workshop repos should set `schema_version: "1.5"` when adopting this shape. Inline **`observables`** on a toc node use **`skill_path`** and an optional **`id`** as a **positive integer** only (ordinal `N` for `{project.slug}.N` in the top-level `observables` list).
 
 ## Documentation
 
