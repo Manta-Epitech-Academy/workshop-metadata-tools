@@ -163,7 +163,7 @@ def build_readme(data: dict[str, Any]) -> str:
     parts.append(
         "\n---\n\n"
         "Validation tooling: "
-        "[workshop-metadata-tools](https://github.com/kevin-cazal/workshop-metadata-tools).\n"
+        "[workshop-metadata-tools](https://github.com/Manta-Epitech-Academy/workshop-metadata-tools).\n"
     )
 
     return "".join(parts)
