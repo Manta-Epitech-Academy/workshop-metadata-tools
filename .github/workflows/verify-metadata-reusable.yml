@@ -7,6 +7,8 @@ on:
 jobs:
   metadata:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Check out workshop repository
         uses: actions/checkout@v4
@@ -35,15 +37,23 @@ jobs:
           PYTHONPATH: ${{ github.workspace }}/workshop-metadata-tools
         run: python "${GITHUB_WORKSPACE}/workshop-metadata-tools/generate_readme.py"
 
-      - name: Ensure generated files match committed version
+      - name: Fail if metadata.yaml is out of date
         run: |
-          if git status --porcelain -- metadata.yaml README.md | grep -q .; then
-            echo "::error::metadata.yaml and/or README.md are out of date."
-            echo "From your workshop root, with workshop-metadata-tools on PYTHONPATH:"
-            echo "  python workshop-metadata-tools/sync_metadata_toc.py"
-            echo "  python workshop-metadata-tools/generate_readme.py"
-            git diff -- metadata.yaml README.md || true
+          if git status --porcelain -- metadata.yaml | grep -q .; then
+            echo "::error::metadata.yaml is out of date. Run locally to fix:"
+            echo "  PYTHONPATH=workshop-metadata-tools python workshop-metadata-tools/sync_metadata_toc.py"
+            git diff -- metadata.yaml || true
             exit 1
+          fi
+
+      - name: Commit README.md if regenerated
+        run: |
+          if git status --porcelain -- README.md | grep -q .; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add README.md
+            git commit -m "docs: regenerate README.md from metadata.yaml [skip ci]"
+            git push
           fi
 
       - name: Verify toc vs markdown and competency rules
