@@ -102,7 +102,7 @@
     "TocObservableRef": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["skill_path"],
+      "required": ["skill_path", "id"],
       "properties": {
         "skill_path": {
           "type": "string",
@@ -112,7 +112,7 @@
         "id": {
           "type": "integer",
           "minimum": 1,
-          "description": "Optional 1-based observable ordinal; corresponds to top-level `observables[].id` `{project.slug}.{id}` when that list is declared."
+          "description": "1-based observable ordinal; corresponds to top-level `observables[].id` `{project.slug}.{id}` when that list is declared."
         }
       }
     },
