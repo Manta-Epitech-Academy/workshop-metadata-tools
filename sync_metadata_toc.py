@@ -4,8 +4,11 @@
 - If metadata.yaml is missing, writes a schema-shaped default (including `documents`
   and generated `toc`).
 - If it exists, rebuilds `toc` for every path in `documents` (or `project.entrypoint`
-  when `documents` is absent), preserving existing `competency` values where the title
-  path still matches.
+  when `documents` is absent), preserving existing `competency` and inline `observables`
+  where the title path (section → part → subpart) still matches.
+
+Generated shape: **sections** (H1) → **parts** (H2) → **subparts** (H3), same rules as
+`toc_lib.markdown_to_toc_sections` (H4+ omitted; orphan H2/H3 omitted).
 """
 
 from __future__ import annotations
@@ -38,7 +41,7 @@ except ImportError:
     print("sync_metadata_toc requires ruamel.yaml: pip install ruamel.yaml", file=sys.stderr)
     sys.exit(1)
 
-from toc_lib import markdown_to_toc_nodes
+from toc_lib import markdown_to_toc_sections
 
 
 def resolve_schema_path(repo_root: Path) -> Path | None:
@@ -116,33 +119,87 @@ def document_paths_from_metadata(data: dict[str, Any]) -> list[str]:
     )
 
 
+def _copy_observables_list(raw: Any) -> list[Any] | None:
+    if not isinstance(raw, list) or not raw:
+        return None
+    out: list[Any] = []
+    for x in raw:
+        if isinstance(x, dict):
+            out.append(dict(x))
+    return out or None
+
+
 def collect_preserved_toc_fields(
     sections: list[Any], prefix: tuple[str, ...] = ()
 ) -> dict[tuple[str, ...], dict[str, Any]]:
-    """Map title path -> preserved keys (competency)."""
+    """Map title path -> preserved keys (competency, observables) for section/part/subpart."""
     out: dict[tuple[str, ...], dict[str, Any]] = {}
-    for node in sections:
-        if not isinstance(node, dict):
+    for sec in sections:
+        if not isinstance(sec, dict):
             continue
-        title = node.get("title")
+        title = sec.get("title")
         if not isinstance(title, str):
             continue
         path = prefix + (title,)
         bag: dict[str, Any] = {}
-        if isinstance(node.get("competency"), list) and node["competency"]:
+        if isinstance(sec.get("competency"), list) and sec["competency"]:
             preserved: list[Any] = []
-            for x in node["competency"]:
+            for x in sec["competency"]:
                 if isinstance(x, str) and x.strip():
                     preserved.append(x)
                 elif isinstance(x, dict):
                     preserved.append(dict(x))
             if preserved:
                 bag["competency"] = preserved
+        obs = _copy_observables_list(sec.get("observables"))
+        if obs:
+            bag["observables"] = obs
         if bag:
             out[path] = bag
-        parts = node.get("parts")
-        if isinstance(parts, list) and parts:
-            out.update(collect_preserved_toc_fields(parts, path))
+        for part in sec.get("parts") or []:
+            if not isinstance(part, dict):
+                continue
+            pt = part.get("title")
+            if not isinstance(pt, str):
+                continue
+            ppath = path + (pt,)
+            pbag: dict[str, Any] = {}
+            if isinstance(part.get("competency"), list) and part["competency"]:
+                preserved_p: list[Any] = []
+                for x in part["competency"]:
+                    if isinstance(x, str) and x.strip():
+                        preserved_p.append(x)
+                    elif isinstance(x, dict):
+                        preserved_p.append(dict(x))
+                if preserved_p:
+                    pbag["competency"] = preserved_p
+            obs_p = _copy_observables_list(part.get("observables"))
+            if obs_p:
+                pbag["observables"] = obs_p
+            if pbag:
+                out[ppath] = pbag
+            for sub in part.get("subparts") or []:
+                if not isinstance(sub, dict):
+                    continue
+                st = sub.get("title")
+                if not isinstance(st, str):
+                    continue
+                spath = ppath + (st,)
+                sbag: dict[str, Any] = {}
+                if isinstance(sub.get("competency"), list) and sub["competency"]:
+                    preserved_s: list[Any] = []
+                    for x in sub["competency"]:
+                        if isinstance(x, str) and x.strip():
+                            preserved_s.append(x)
+                        elif isinstance(x, dict):
+                            preserved_s.append(dict(x))
+                    if preserved_s:
+                        sbag["competency"] = preserved_s
+                obs_s = _copy_observables_list(sub.get("observables"))
+                if obs_s:
+                    sbag["observables"] = obs_s
+                if sbag:
+                    out[spath] = sbag
     return out
 
 
@@ -151,17 +208,43 @@ def apply_preserved_toc_fields(
     bag_map: dict[tuple[str, ...], dict[str, Any]],
     prefix: tuple[str, ...] = (),
 ) -> None:
-    for node in sections:
-        title = node.get("title")
+    for sec in sections:
+        title = sec.get("title")
         if not isinstance(title, str):
             continue
         path = prefix + (title,)
         bag = bag_map.get(path)
-        if bag and "competency" in bag:
-            node["competency"] = bag["competency"]
-        parts = node.get("parts")
-        if isinstance(parts, list) and parts:
-            apply_preserved_toc_fields(parts, bag_map, path)
+        if bag:
+            if "competency" in bag:
+                sec["competency"] = bag["competency"]
+            if "observables" in bag:
+                sec["observables"] = bag["observables"]
+        for part in sec.get("parts") or []:
+            if not isinstance(part, dict):
+                continue
+            pt = part.get("title")
+            if not isinstance(pt, str):
+                continue
+            ppath = path + (pt,)
+            pbag = bag_map.get(ppath)
+            if pbag:
+                if "competency" in pbag:
+                    part["competency"] = pbag["competency"]
+                if "observables" in pbag:
+                    part["observables"] = pbag["observables"]
+            for sub in part.get("subparts") or []:
+                if not isinstance(sub, dict):
+                    continue
+                st = sub.get("title")
+                if not isinstance(st, str):
+                    continue
+                spath = ppath + (st,)
+                sbag = bag_map.get(spath)
+                if sbag:
+                    if "competency" in sbag:
+                        sub["competency"] = sbag["competency"]
+                    if "observables" in sbag:
+                        sub["observables"] = sbag["observables"]
 
 
 def build_toc_for_documents(
@@ -192,7 +275,7 @@ def build_toc_for_documents(
                 f"markdown not found for documents entry: {rel} (looked under {base_dir})"
             )
         text = md.read_text(encoding="utf-8")
-        sections = markdown_to_toc_nodes(text)
+        sections = markdown_to_toc_sections(text)
         bag_map = prev_by_doc.get(rel, {})
         apply_preserved_toc_fields(sections, bag_map)
         out.append({"document": rel, "sections": sections})
@@ -272,7 +355,7 @@ def build_default_metadata(metadata_dir: Path, md_files: list[str]) -> dict[str,
     documents = [{"path": p} for p in md_files]
     toc = build_toc_for_documents(metadata_dir, md_files, None)
     return {
-        "schema_version": "1.2",
+        "schema_version": "1.5",
         "project": {
             "name": slug.replace("-", " ").title(),
             "slug": slug,
